@@ -3,31 +3,78 @@ import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { registerUser } from "../services/api";
 
-const RegisterScreen = () => {
+const RegisterScreen = ({ navigation }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
 
-  const handleRegister = async () => {
-    if (!name || !email || !password || !phoneNumber) {
-      Alert.alert("Error", "Por favor, completa todos los campos.");
-      return;
+  // Estado para mostrar mensajes de error debajo de cada campo
+  const [errors, setErrors] = useState({});
+
+  const validateFields = () => {
+    const newErrors = {};
+    let isValid = true;
+
+    // 🔹 Validar nombre (solo letras)
+    if (!name.trim()) {
+      newErrors.name = "El nombre es obligatorio.";
+      isValid = false;
+    } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(name)) {
+      newErrors.name = "El nombre solo puede contener letras.";
+      isValid = false;
     }
+
+    // 🔹 Validar correo electrónico
+    if (!email.trim()) {
+      newErrors.email = "El correo es obligatorio.";
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = "Correo electrónico no válido.";
+      isValid = false;
+    }
+
+    // 🔹 Validar teléfono (exactamente 10 dígitos)
+    if (!phoneNumber.trim()) {
+      newErrors.phoneNumber = "El teléfono es obligatorio.";
+      isValid = false;
+    } else if (!/^\d{10}$/.test(phoneNumber)) {
+      newErrors.phoneNumber = "El teléfono debe tener 10 dígitos.";
+      isValid = false;
+    }
+
+    // 🔹 Validar contraseña (mínimo 8 caracteres, al menos una mayúscula)
+    if (!password.trim()) {
+      newErrors.password = "La contraseña es obligatoria.";
+      isValid = false;
+    } else if (password.length < 8) {
+      newErrors.password = "Debe tener al menos 8 caracteres.";
+      isValid = false;
+    } else if (!/[A-Z]/.test(password)) {
+      newErrors.password = "Debe incluir al menos una letra mayúscula.";
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleRegister = async () => {
+    if (!validateFields()) return;
 
     const newUser = {
       email,
       name,
       phoneNumber,
       password,
-      role: null, // campo oculto
+      role: null,
     };
 
     try {
       const result = await registerUser(newUser);
       if (result.isSuccess) {
         Alert.alert("Éxito", "Cuenta creada correctamente.");
-        // Aquí podrías navegar al login
+        navigation.replace("Login");
       } else {
         Alert.alert("Error", result.message || "No se pudo crear la cuenta.");
       }
@@ -40,25 +87,38 @@ const RegisterScreen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>REGISTRO</Text>
 
+      {/* 🔹 Campo nombre */}
       <TextInput
         style={styles.input}
         placeholder="Nombre Completo"
         value={name}
         onChangeText={setName}
       />
+      {errors.name && <Text style={styles.error}>{errors.name}</Text>}
+
+      {/* Campo correo */}
       <TextInput
         style={styles.input}
         placeholder="Correo Electrónico"
         value={email}
         onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
       />
+      {errors.email && <Text style={styles.error}>{errors.email}</Text>}
+
+      {/*Campo teléfono */}
       <TextInput
         style={styles.input}
         placeholder="Teléfono"
         value={phoneNumber}
         onChangeText={setPhoneNumber}
         keyboardType="numeric"
+        maxLength={10}
       />
+      {errors.phoneNumber && <Text style={styles.error}>{errors.phoneNumber}</Text>}
+
+      {/* Campo contraseña */}
       <TextInput
         style={styles.input}
         placeholder="Contraseña"
@@ -66,12 +126,20 @@ const RegisterScreen = () => {
         value={password}
         onChangeText={setPassword}
       />
+      {errors.password && <Text style={styles.error}>{errors.password}</Text>}
 
+      {/* 🔹 Botón de registro */}
       <TouchableOpacity style={styles.button} onPress={handleRegister}>
         <Text style={styles.buttonText}>CREAR CUENTA</Text>
       </TouchableOpacity>
 
-      <Text style={styles.footer}>O regístrate con:</Text>
+      {/* 🔹 Enlace a iniciar sesión */}
+      <View style={styles.loginLinkContainer}>
+        <Text style={styles.loginText}>¿Ya tienes cuenta?</Text>
+        <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+          <Text style={styles.loginLink}> Inicia sesión</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -87,10 +155,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   title: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "bold",
     color: "#3CB371",
-    marginBottom: 20,
+    marginBottom: 25,
   },
   input: {
     width: "100%",
@@ -98,22 +166,40 @@ const styles = StyleSheet.create({
     borderColor: "#3CB371",
     borderRadius: 8,
     padding: 10,
-    marginBottom: 15,
+    marginBottom: 5,
+    fontSize: 16,
   },
   button: {
-    backgroundColor: "#7FFF00",
+    backgroundColor: "#3CB371",
     paddingVertical: 12,
     paddingHorizontal: 30,
     borderRadius: 8,
     width: "100%",
     alignItems: "center",
+    marginTop: 15,
   },
   buttonText: {
     color: "#fff",
     fontWeight: "bold",
+    fontSize: 16,
   },
-  footer: {
-    marginTop: 20,
+  loginLinkContainer: {
+    flexDirection: "row",
+    marginTop: 15,
+  },
+  loginText: {
+    fontSize: 15,
     color: "#333",
+  },
+  loginLink: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#00b229ed",
+  },
+  error: {
+    color: "red",
+    fontSize: 13,
+    alignSelf: "flex-start",
+    marginBottom: 8,
   },
 });

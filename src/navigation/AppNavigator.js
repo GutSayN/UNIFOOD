@@ -1,0 +1,44 @@
+import React, { useEffect, useState } from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+import { View, ActivityIndicator } from "react-native";
+
+import LoginScreen from "../views/LoginScreen";
+import HomeScreen from "../views/HomeScreen";
+import RegisterScreen from "../views/RegisterScreen"; 
+import { getUserSession } from "../hooks/useAuth";
+
+const Stack = createStackNavigator();
+
+export default function AppNavigator() {
+  const [initialRoute, setInitialRoute] = useState(null);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const session = await getUserSession();
+      setInitialRoute(session ? "Home" : "Login");
+    };
+    checkSession();
+  }, []);
+
+  if (!initialRoute) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#000" />
+      </View>
+    );
+  }
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName={initialRoute}
+        screenOptions={{ headerShown: false }}
+      >
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="Home" component={HomeScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
