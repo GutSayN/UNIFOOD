@@ -13,17 +13,35 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Unifood necesita acceso a tus fotos para subir imágenes de productos.",
+        "NSCameraUsageDescription": "Unifood necesita acceso a tu cámara para tomar fotos de productos."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Unifood necesita acceso a tus fotos para subir imágenes de productos.",
+          "cameraPermission": "Unifood necesita acceso a tu cámara para tomar fotos de productos."
+        }
+      ]
+    ]
   }
 }

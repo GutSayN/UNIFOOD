@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -5,7 +6,9 @@ import { View, ActivityIndicator } from "react-native";
 
 import LoginScreen from "../views/LoginScreen";
 import HomeScreen from "../views/HomeScreen";
-import RegisterScreen from "../views/RegisterScreen"; 
+import RegisterScreen from "../views/RegisterScreen";
+import ProductsListScreen from "../views/ProductsListScreen";
+import ProductFormScreen from "../views/ProductFormScreen";
 import { getUserSession } from "../hooks/useAuth";
 
 const Stack = createStackNavigator();
@@ -24,7 +27,7 @@ export default function AppNavigator() {
   if (!initialRoute) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#000" />
+        <ActivityIndicator size="large" color="#3CB371" />
       </View>
     );
   }
@@ -38,6 +41,8 @@ export default function AppNavigator() {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="ProductsList" component={ProductsListScreen} />
+        <Stack.Screen name="ProductForm" component={ProductFormScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
