@@ -1,5 +1,6 @@
 // src/services/productService.js
 const PRODUCT_API_URL = "https://product-microservice-cwk6.onrender.com/api/product";
+import * as ImagePicker from 'expo-image-picker';
 
 // Obtener todos los productos
 export const getAllProducts = async () => {
@@ -50,26 +51,52 @@ export const createProduct = async (productData) => {
       formData.append("categoryName", productData.categoryName);
     }
     
-    if (productData.image) {
+    if (productData.image && productData.image.uri) {
+      const imageUri = productData.image.uri;
+      const filename = productData.image.fileName || 
+                      imageUri.split('/').pop() || 
+                      `product_${Date.now()}.jpg`;
+      
+      let imageType = 'image/jpeg';
+      
+      if (productData.image.mimeType) {
+        imageType = productData.image.mimeType;
+      } else if (productData.image.type) {
+        if (productData.image.type === 'image') {
+          if (filename.toLowerCase().endsWith('.png')) {
+            imageType = 'image/png';
+          } else if (filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg')) {
+            imageType = 'image/jpeg';
+          }
+        } else if (productData.image.type.startsWith('image/')) {
+          imageType = productData.image.type;
+        }
+      }
+      
       formData.append("image", {
-        uri: productData.image.uri,
-        type: productData.image.type || "image/jpeg",
-        name: productData.image.fileName || "product.jpg",
+        uri: imageUri,
+        type: imageType,
+        name: filename,
       });
     }
 
     const response = await fetch(PRODUCT_API_URL, {
       method: "POST",
       headers: {
-        accept: "*/*",
+        "Accept": "*/*",
       },
       body: formData,
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error del servidor: ${response.status}`);
+    }
+
     const result = await response.json();
     return result;
+    
   } catch (error) {
-    console.error("Error al crear producto:", error);
     throw error;
   }
 };
@@ -90,36 +117,55 @@ export const updateProduct = async (id, productData) => {
     }
     
     if (productData.image && productData.image.uri) {
+      const imageUri = productData.image.uri;
+      const filename = productData.image.fileName || 
+                      imageUri.split('/').pop() || 
+                      `product_${Date.now()}.jpg`;
+      
+      let imageType = 'image/jpeg'; 
+      
+      if (productData.image.mimeType) {
+        imageType = productData.image.mimeType;
+      } else if (productData.image.type) {
+        if (productData.image.type === 'image') {
+          if (filename.toLowerCase().endsWith('.png')) {
+            imageType = 'image/png';
+          } else if (filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg')) {
+            imageType = 'image/jpeg';
+          }
+        } else if (productData.image.type.startsWith('image/')) {
+          imageType = productData.image.type;
+        }
+      }
+      
       formData.append("image", {
-        uri: productData.image.uri,
-        type: productData.image.type || "image/jpeg",
-        name: productData.image.fileName || "product.jpg",
+        uri: imageUri,
+        type: imageType,
+        name: filename,
       });
     }
     
-    if (productData.imageUrl) {
-      formData.append("imageUrl", productData.imageUrl);
-    }
-    
-    if (productData.imageLocalPath) {
-      formData.append("imageLocalPath", productData.imageLocalPath);
-    }
-
     const response = await fetch(`${PRODUCT_API_URL}/${id}`, {
       method: "PUT",
       headers: {
-        accept: "*/*",
+        "Accept": "*/*",
       },
       body: formData,
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error del servidor: ${response.status}`);
+    }
+
     const result = await response.json();
     return result;
+    
   } catch (error) {
-    console.error("Error al actualizar producto:", error);
     throw error;
   }
 };
+
 
 // Eliminar producto
 export const deleteProduct = async (id) => {
@@ -134,6 +180,37 @@ export const deleteProduct = async (id) => {
     return result;
   } catch (error) {
     console.error("Error al eliminar producto:", error);
+    throw error;
+  }
+};
+
+const pickImage = async () => {
+  try {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaType.Images, 
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
+      
+      let mimeType = 'image/jpeg';
+      if (asset.uri.toLowerCase().endsWith('.png')) {
+        mimeType = 'image/png';
+      }
+      
+      return {
+        uri: asset.uri,
+        type: mimeType,  
+        fileName: asset.fileName || `photo_${Date.now()}.${mimeType === 'image/png' ? 'png' : 'jpg'}`,
+        mimeType: mimeType,
+      };
+    }
+    
+    return null;
+  } catch (error) {
     throw error;
   }
 };
