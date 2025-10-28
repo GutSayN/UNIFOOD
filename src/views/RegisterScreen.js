@@ -9,6 +9,8 @@ const RegisterScreen = ({ navigation }) => {
   const [password, setPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
 
+
+
   // Estado para mostrar mensajes de error debajo de cada campo
   const [errors, setErrors] = useState({});
 

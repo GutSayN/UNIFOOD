@@ -1,5 +1,5 @@
 // tegistro
-const API_URL = "https://auth-microservice-aw85.onrender.com/api/auth";
+const API_URL = "https://auth-microservice-tfql.onrender.com/api/auth";
 
 export const registerUser = async (data) => {
   try {
