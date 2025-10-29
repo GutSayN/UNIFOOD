@@ -10,51 +10,61 @@ import {
   ActivityIndicator,
   Image,
   RefreshControl,
-  TextInput,
+  Linking,
 } from "react-native";
 import { getAllProducts } from "../services/productService";
-import { clearUserSession } from "../hooks/useAuth";
+import { getUserData, clearUserSession } from "../hooks/useAuth";
 
 export default function HomeScreen({ navigation }) {
   const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    loadProducts();
+    loadUserAndProducts();
   }, []);
 
   useEffect(() => {
-    // Filtrar productos cuando cambia la búsqueda
-    if (searchQuery.trim() === "") {
-      setFilteredProducts(products);
-    } else {
-      const filtered = products.filter(
-        (product) =>
-          product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          product.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredProducts(filtered);
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadProducts();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadUserAndProducts = async () => {
+    try {
+      setLoading(true);
+      const userData = await getUserData();
+      
+      if (!userData) {
+        Alert.alert("Error", "Sesión expirada");
+        navigation.replace("Login");
+        return;
+      }
+      
+      setCurrentUser(userData);
+      await loadProducts();
+    } catch (error) {
+      console.error("Error al cargar datos:", error);
+      Alert.alert("Error", "Ocurrió un problema al cargar los datos");
+    } finally {
+      setLoading(false);
     }
-  }, [searchQuery, products]);
+  };
 
   const loadProducts = async () => {
     try {
-      setLoading(true);
       const response = await getAllProducts();
+      
       if (response.isSuccess && response.result) {
         setProducts(response.result);
-        setFilteredProducts(response.result);
       } else {
-        Alert.alert("Error", "No se pudieron cargar los productos");
+        setProducts([]);
       }
     } catch (error) {
-      Alert.alert("Error", "Ocurrió un problema al cargar los productos");
-      console.error(error);
-    } finally {
-      setLoading(false);
+      console.error("Error al cargar productos:", error);
+      setProducts([]);
     }
   };
 
@@ -66,8 +76,8 @@ export default function HomeScreen({ navigation }) {
 
   const handleLogout = async () => {
     Alert.alert(
-      "Cerrar Sesión",
-      "¿Estás seguro que deseas salir?",
+      "Cerrar sesión",
+      "¿Estás seguro de que quieres salir?",
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -82,37 +92,129 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
-  const renderProduct = ({ item }) => (
-    <TouchableOpacity
-      style={styles.productCard}
-      onPress={() => navigation.navigate("ProductForm", { product: item, mode: "edit" })}
-      activeOpacity={0.7}
-    >
-      {item.imageUrl ? (
-        <Image
-          source={{ uri: `https://product-microservice-cwk6.onrender.com${item.imageUrl}` }}
-          style={styles.productImage}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={styles.noImage}>
-          <Text style={styles.noImageText}>📦</Text>
-        </View>
-      )}
+  const handleWhatsApp = (product) => {
+    // ✅ Verificar que el producto tenga userPhone
+    if (!product.userPhone) {
+      Alert.alert(
+        "Sin contacto",
+        "Este vendedor no tiene número de teléfono registrado."
+      );
+      return;
+    }
 
-      <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text style={styles.productPrice}>${item.price.toLocaleString()}</Text>
-        {item.categoryName && (
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{item.categoryName}</Text>
+    // ✅ Limpiar el número de teléfono (quitar espacios, guiones, etc.)
+    const phoneNumber = product.userPhone.replace(/[^\d+]/g, '');
+    
+    // ✅ Construir mensaje para WhatsApp
+    const message = `Hola! Estoy interesado en tu producto: ${product.name} - $${product.price}`;
+    const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
+
+    console.log("📱 Abriendo WhatsApp:", whatsappUrl);
+
+    Linking.canOpenURL(whatsappUrl)
+      .then((supported) => {
+        if (supported) {
+          return Linking.openURL(whatsappUrl);
+        } else {
+          Alert.alert(
+            "WhatsApp no disponible",
+            "No se pudo abrir WhatsApp. ¿Lo tienes instalado?"
+          );
+        }
+      })
+      .catch((err) => {
+        console.error("Error al abrir WhatsApp:", err);
+        Alert.alert("Error", "No se pudo abrir WhatsApp");
+      });
+  };
+
+  const isMyProduct = (product) => {
+    if (!currentUser || !product) return false;
+    return product.userId === currentUser.userId || product.userId === currentUser.id;
+  };
+
+  const renderProduct = ({ item }) => {
+    const isOwner = isMyProduct(item);
+
+    return (
+      <View style={styles.productCard}>
+        {/* Header con info del vendedor */}
+        <View style={styles.productHeader}>
+          <View style={styles.sellerInfo}>
+            <View style={styles.sellerAvatar}>
+              <Text style={styles.sellerAvatarText}>
+                {item.userName ? item.userName.charAt(0).toUpperCase() : '?'}
+              </Text>
+            </View>
+            <View>
+              <Text style={styles.sellerName}>
+                {item.userName || "Usuario Anónimo"}
+              </Text>
+              {item.categoryName && (
+                <Text style={styles.categoryText}>{item.categoryName}</Text>
+              )}
+            </View>
+          </View>
+          
+          {/* Solo mostrar botón de editar si es mi producto */}
+          {isOwner && (
+            <TouchableOpacity
+              style={styles.editIconButton}
+              onPress={() =>
+                navigation.navigate("ProductForm", { product: item, mode: "edit" })
+              }
+            >
+              <Text style={styles.editIcon}>✏️</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Imagen del producto */}
+        {item.imageUrl ? (
+          <Image
+            source={{ 
+              uri: `https://product-microservice-cwk6.onrender.com${item.imageUrl}` 
+            }}
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.noImage}>
+            <Text style={styles.noImageText}>📦</Text>
           </View>
         )}
+
+        {/* Información del producto */}
+        <View style={styles.productInfo}>
+          <Text style={styles.productName}>{item.name}</Text>
+          <Text style={styles.productPrice}>${item.price.toLocaleString()}</Text>
+          
+          {item.description && (
+            <Text style={styles.productDescription} numberOfLines={3}>
+              {item.description}
+            </Text>
+          )}
+
+          {/* Botón de WhatsApp - visible para todos menos el dueño */}
+          {!isOwner && (
+            <TouchableOpacity
+              style={styles.whatsappButton}
+              onPress={() => handleWhatsApp(item)}
+            >
+              <Text style={styles.whatsappButtonText}>💬 Contactar vendedor</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Mensaje para el dueño */}
+          {isOwner && (
+            <View style={styles.ownerBadge}>
+              <Text style={styles.ownerBadgeText}>📌 Tu producto</Text>
+            </View>
+          )}
+        </View>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -127,75 +229,44 @@ export default function HomeScreen({ navigation }) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.title}>Unifood</Text>
+        <Text style={styles.headerTitle}>Unifood</Text>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.navigate("ProductsList")}
+          >
+            <Text style={styles.headerButtonText}>Mis Productos</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={handleLogout}
           >
-            <Text style={styles.logoutText}>Salir 🚪</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Barra de búsqueda */}
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar productos..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#999"
-          />
-          {searchQuery !== "" && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Text style={styles.clearIcon}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Botones de acción */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.adminButton}
-            onPress={() => navigation.navigate("ProductsList")}
-          >
-            <Text style={styles.adminButtonText}>⚙️ Administrar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => navigation.navigate("ProductForm", { mode: "create" })}
-          >
-            <Text style={styles.addButtonText}>+ Agregar</Text>
+            <Text style={styles.logoutButtonText}>Salir</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Lista de productos */}
-      {filteredProducts.length === 0 ? (
+      {products.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>
-            {searchQuery ? "🔍" : "📦"}
-          </Text>
-          <Text style={styles.emptyText}>
-            {searchQuery 
-              ? "No se encontraron productos"
-              : "No hay productos registrados"}
-          </Text>
+          <Text style={styles.emptyIcon}>🍽️</Text>
+          <Text style={styles.emptyText}>No hay productos disponibles</Text>
           <Text style={styles.emptySubtext}>
-            {searchQuery
-              ? "Intenta con otro término de búsqueda"
-              : "Toca el botón '+' para agregar tu primer producto"}
+            Sé el primero en publicar algo
           </Text>
+          <TouchableOpacity
+            style={styles.addFirstButton}
+            onPress={() => navigation.navigate("ProductForm", { mode: "create" })}
+          >
+            <Text style={styles.addFirstButtonText}>+ Publicar producto</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={filteredProducts}
+          data={products}
           keyExtractor={(item) => item.productId}
           renderItem={renderProduct}
-          numColumns={2}
           contentContainerStyle={styles.listContent}
-          columnWrapperStyle={styles.row}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -203,13 +274,18 @@ export default function HomeScreen({ navigation }) {
               colors={["#3CB371"]}
             />
           }
-          ListHeaderComponent={
-            <Text style={styles.resultsText}>
-              {filteredProducts.length} producto{filteredProducts.length !== 1 ? "s" : ""} 
-              {searchQuery && ` encontrado${filteredProducts.length !== 1 ? "s" : ""}`}
-            </Text>
-          }
+          showsVerticalScrollIndicator={false}
         />
+      )}
+
+      {/* Botón flotante para agregar producto */}
+      {products.length > 0 && (
+        <TouchableOpacity
+          style={styles.floatingButton}
+          onPress={() => navigation.navigate("ProductForm", { mode: "create" })}
+        >
+          <Text style={styles.floatingButtonText}>+</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -228,146 +304,150 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: "#fff",
-    paddingTop: 50,
     paddingHorizontal: 20,
+    paddingTop: 50,
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
-  },
-  headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
   },
-  title: {
-    fontSize: 28,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: "bold",
     color: "#3CB371",
   },
-  logoutButton: {
-    padding: 8,
-  },
-  logoutText: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "600",
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f5f5f5",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 15,
-  },
-  searchIcon: {
-    fontSize: 18,
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: "#333",
-  },
-  clearIcon: {
-    fontSize: 18,
-    color: "#999",
-    paddingHorizontal: 8,
-  },
-  actionButtons: {
+  headerButtons: {
     flexDirection: "row",
     gap: 10,
   },
-  adminButton: {
-    flex: 1,
-    backgroundColor: "#4CAF50",
-    paddingVertical: 12,
+  headerButton: {
+    backgroundColor: "#3CB371",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
-    alignItems: "center",
   },
-  adminButtonText: {
+  headerButtonText: {
     color: "#fff",
-    fontWeight: "bold",
+    fontWeight: "600",
     fontSize: 14,
   },
-  addButton: {
-    flex: 1,
-    backgroundColor: "#3CB371",
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
+  logoutButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  addButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
+  logoutButtonText: {
+    color: "#f44336",
+    fontWeight: "600",
     fontSize: 14,
   },
   listContent: {
-    padding: 15,
-  },
-  row: {
-    justifyContent: "space-between",
-  },
-  resultsText: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 10,
-    fontWeight: "600",
+    paddingBottom: 80,
   },
   productCard: {
     backgroundColor: "#fff",
-    borderRadius: 12,
-    marginBottom: 15,
-    width: "48%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    overflow: "hidden",
+    marginBottom: 2,
+  },
+  productHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 15,
+  },
+  sellerInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  sellerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#3CB371",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sellerAvatarText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  sellerName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  categoryText: {
+    fontSize: 12,
+    color: "#666",
+  },
+  editIconButton: {
+    padding: 5,
+  },
+  editIcon: {
+    fontSize: 20,
   },
   productImage: {
     width: "100%",
-    height: 140,
+    height: 400,
+    backgroundColor: "#f0f0f0",
   },
   noImage: {
     width: "100%",
-    height: 140,
+    height: 400,
     backgroundColor: "#e0e0e0",
     justifyContent: "center",
     alignItems: "center",
   },
   noImageText: {
-    fontSize: 40,
+    fontSize: 80,
   },
   productInfo: {
-    padding: 12,
+    padding: 15,
   },
   productName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#333",
     marginBottom: 5,
   },
   productPrice: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: "bold",
     color: "#3CB371",
-    marginBottom: 5,
+    marginBottom: 10,
   },
-  categoryBadge: {
-    backgroundColor: "#f0f0f0",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 5,
-    alignSelf: "flex-start",
-  },
-  categoryText: {
-    fontSize: 12,
+  productDescription: {
+    fontSize: 14,
     color: "#666",
-    fontWeight: "500",
+    lineHeight: 20,
+    marginBottom: 15,
+  },
+  whatsappButton: {
+    backgroundColor: "#25D366",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  whatsappButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  ownerBadge: {
+    backgroundColor: "#f0f9f4",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: "#3CB371",
+  },
+  ownerBadgeText: {
+    color: "#3CB371",
+    fontWeight: "600",
+    textAlign: "center",
   },
   loadingText: {
     marginTop: 10,
@@ -395,5 +475,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#999",
     textAlign: "center",
+    marginBottom: 20,
+  },
+  addFirstButton: {
+    backgroundColor: "#3CB371",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  addFirstButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  floatingButton: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    backgroundColor: "#3CB371",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  floatingButtonText: {
+    color: "#fff",
+    fontSize: 32,
+    fontWeight: "bold",
   },
 });

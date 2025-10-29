@@ -1,22 +1,28 @@
 {
   "expo": {
     "name": "Unifood",
-    "slug": "Unifood",
+    "slug": "unifood",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.unifood",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Unifood necesita acceso a tus fotos para subir imágenes de productos.",
-        "NSCameraUsageDescription": "Unifood necesita acceso a tu cámara para tomar fotos de productos."
+        "NSPhotoLibraryUsageDescription": "Unifood necesita acceso a tus fotos para que puedas agregar imágenes de tus productos.",
+        "NSCameraUsageDescription": "Unifood necesita acceso a tu cámara para que puedas tomar fotos de tus productos.",
+        "LSApplicationQueriesSchemes": [
+          "whatsapp"
+        ]
       }
     },
     "android": {
@@ -24,15 +30,12 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "usesCleartextTraffic": true,  
       "permissions": [
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "CAMERA",
-         "INTERNET",
-         "ACCESS_NETWORK_STATE"  
-      ] 
+        "CAMERA"
+      ],
+      "package": "com.yourcompany.unifood"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,8 +44,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Unifood necesita acceso a tus fotos para subir imágenes de productos.",
-          "cameraPermission": "Unifood necesita acceso a tu cámara para tomar fotos de productos."
+          "photosPermission": "La aplicación necesita acceso a tus fotos para que puedas agregar imágenes de productos.",
+          "cameraPermission": "La aplicación necesita acceso a tu cámara para tomar fotos de productos."
         }
       ]
     ]

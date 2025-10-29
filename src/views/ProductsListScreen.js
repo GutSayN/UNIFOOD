@@ -1,4 +1,4 @@
-
+// src/screens/ProductsListScreen.js
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -11,31 +11,70 @@ import {
   Image,
   RefreshControl,
 } from "react-native";
-import { getAllProducts, deleteProduct } from "../services/productService";
+import { getProductsByUserId, deleteProduct } from "../services/productService";
+import { getUserData } from "../hooks/useAuth";
 
 export default function ProductsListScreen({ navigation }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    loadProducts();
+    loadUserAndProducts();
   }, []);
 
-  const loadProducts = async () => {
+  // Recargar productos cuando la pantalla recibe foco
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (currentUser) {
+        loadProducts();
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, currentUser]);
+
+  const loadUserAndProducts = async () => {
     try {
       setLoading(true);
-      const response = await getAllProducts();
-      if (response.isSuccess && response.result) {
-        setProducts(response.result);
-      } else {
-        Alert.alert("Error", "No se pudieron cargar los productos");
+      const userData = await getUserData();
+      
+      if (!userData) {
+        Alert.alert("Error", "No se pudo obtener información del usuario");
+        navigation.goBack();
+        return;
       }
+      
+      setCurrentUser(userData);
+      await loadProductsForUser(userData);
     } catch (error) {
-      Alert.alert("Error", "Ocurrió un problema al cargar los productos");
+      Alert.alert("Error", "Ocurrió un problema al cargar los datos");
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProductsForUser = async (userData) => {
+    try {
+      const userId = userData.userId || userData.id;
+      const response = await getProductsByUserId(userId);
+      
+      if (response.isSuccess && response.result) {
+        setProducts(response.result);
+      } else {
+        setProducts([]);
+      }
+    } catch (error) {
+      console.error("Error al cargar productos:", error);
+      setProducts([]);
+    }
+  };
+
+  const loadProducts = async () => {
+    if (currentUser) {
+      await loadProductsForUser(currentUser);
     }
   };
 
@@ -82,15 +121,17 @@ export default function ProductsListScreen({ navigation }) {
         />
       ) : (
         <View style={styles.noImage}>
-          <Text style={styles.noImageText}>Sin imagen</Text>
+          <Text style={styles.noImageText}>📦</Text>
         </View>
       )}
 
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productPrice}>${item.price}</Text>
+        <Text style={styles.productPrice}>${item.price.toLocaleString()}</Text>
         {item.categoryName && (
-          <Text style={styles.productCategory}>{item.categoryName}</Text>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{item.categoryName}</Text>
+          </View>
         )}
         {item.description && (
           <Text style={styles.productDescription} numberOfLines={2}>
@@ -123,7 +164,7 @@ export default function ProductsListScreen({ navigation }) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#3CB371" />
-        <Text style={styles.loadingText}>Cargando productos...</Text>
+        <Text style={styles.loadingText}>Cargando tus productos...</Text>
       </View>
     );
   }
@@ -137,7 +178,7 @@ export default function ProductsListScreen({ navigation }) {
         >
           <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Productos</Text>
+        <Text style={styles.title}>Mis Productos</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => navigation.navigate("ProductForm", { mode: "create" })}
@@ -148,9 +189,10 @@ export default function ProductsListScreen({ navigation }) {
 
       {products.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No hay productos registrados</Text>
+          <Text style={styles.emptyIcon}>📦</Text>
+          <Text style={styles.emptyText}>No tienes productos publicados</Text>
           <Text style={styles.emptySubtext}>
-            Toca el botón "Nuevo" para agregar uno
+            Toca el botón "Nuevo" para publicar tu primer producto
           </Text>
         </View>
       ) : (
@@ -165,6 +207,11 @@ export default function ProductsListScreen({ navigation }) {
               onRefresh={onRefresh}
               colors={["#3CB371"]}
             />
+          }
+          ListHeaderComponent={
+            <Text style={styles.countText}>
+              {products.length} producto{products.length !== 1 ? "s" : ""} publicado{products.length !== 1 ? "s" : ""}
+            </Text>
           }
         />
       )}
@@ -181,6 +228,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f5f5f5",
   },
   header: {
     backgroundColor: "#fff",
@@ -219,38 +267,39 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 15,
   },
+  countText: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 15,
+    fontWeight: "600",
+  },
   productCard: {
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 15,
+    borderRadius: 12,
     marginBottom: 15,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    overflow: "hidden",
   },
   productImage: {
     width: "100%",
     height: 200,
-    borderRadius: 8,
-    marginBottom: 10,
   },
   noImage: {
     width: "100%",
     height: 200,
-    borderRadius: 8,
     backgroundColor: "#e0e0e0",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
   },
   noImageText: {
-    color: "#999",
-    fontSize: 16,
+    fontSize: 60,
   },
   productInfo: {
-    marginBottom: 10,
+    padding: 15,
   },
   productName: {
     fontSize: 18,
@@ -262,13 +311,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: "#3CB371",
-    marginBottom: 5,
+    marginBottom: 8,
   },
-  productCategory: {
-    fontSize: 14,
+  categoryBadge: {
+    backgroundColor: "#f0f0f0",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+    alignSelf: "flex-start",
+    marginBottom: 8,
+  },
+  categoryText: {
+    fontSize: 12,
     color: "#666",
-    fontStyle: "italic",
-    marginBottom: 5,
+    fontWeight: "500",
   },
   productDescription: {
     fontSize: 14,
@@ -277,23 +333,22 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
+    padding: 15,
+    paddingTop: 0,
+    gap: 10,
   },
   editButton: {
     flex: 1,
     backgroundColor: "#4CAF50",
-    padding: 10,
+    padding: 12,
     borderRadius: 8,
-    marginRight: 5,
     alignItems: "center",
   },
   deleteButton: {
     flex: 1,
     backgroundColor: "#f44336",
-    padding: 10,
+    padding: 12,
     borderRadius: 8,
-    marginLeft: 5,
     alignItems: "center",
   },
   buttonText: {
@@ -312,11 +367,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 40,
   },
+  emptyIcon: {
+    fontSize: 80,
+    marginBottom: 20,
+  },
   emptyText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#666",
     marginBottom: 10,
+    textAlign: "center",
   },
   emptySubtext: {
     fontSize: 14,

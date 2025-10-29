@@ -8,8 +8,8 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loginUser } from "../services/api";
+import { saveUserSession } from "../hooks/useAuth";
 
 export default function LoginScreen({ navigation }) {
   const [userName, setUserName] = useState("");
@@ -34,21 +34,16 @@ export default function LoginScreen({ navigation }) {
         }
 
         if (user.status === 1) {
-          // ✅ Guardar token y usuario en AsyncStorage
-          await AsyncStorage.setItem("token", token);
-          await AsyncStorage.setItem("user", JSON.stringify(user));
-
-          // ✅ Guardar hora de expiración (1 hora)
-          const expirationTime = Date.now() + 3600 * 1000; // 1 hora
-          await AsyncStorage.setItem("session_expiration", expirationTime.toString());
+          // ✅ Guardar sesión con token y datos de usuario
+          await saveUserSession(token, user);
 
           // ✅ Redirigir según rol
           if (user.roles.includes("ADMIN")) {
             Alert.alert("Bienvenido", `Hola, ${user.name}!`);
-            navigation.replace("AdminHome"); // tu pantalla para admin
+            navigation.replace("AdminHome");
           } else if (user.roles.includes("CLIENTE")) {
             Alert.alert("Bienvenido", `Hola, ${user.name}!`);
-            navigation.replace("Home"); // tu pantalla para usuario normal
+            navigation.replace("Home");
           } else {
             Alert.alert("Error", "Rol de usuario no reconocido.");
           }
@@ -85,7 +80,6 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.buttonText}>Ingresar</Text>
       </TouchableOpacity>
 
-      {/* Texto para registrarse */}
       <View style={styles.registerContainer}>
         <Text style={styles.registerText}>¿No tienes cuenta?</Text>
         <TouchableOpacity onPress={() => navigation.navigate("Register")}>
@@ -108,17 +102,18 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "bold",
     marginBottom: 20,
+    color: "#3CB371",
   },
   input: {
     width: "100%",
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#3CB371",
     borderRadius: 8,
     padding: 10,
     marginBottom: 15,
   },
   button: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#3CB371",
     padding: 12,
     borderRadius: 8,
     width: "100%",
@@ -127,6 +122,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#fff",
     fontSize: 18,
+    fontWeight: "bold",
   },
   registerContainer: {
     flexDirection: "row",

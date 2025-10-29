@@ -1,4 +1,4 @@
-
+// src/screens/ProductFormScreen.js
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -10,110 +10,116 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { createProduct, updateProduct } from "../services/productService";
+import { createProduct, updateProduct, pickImage } from "../services/productService";
+import { getUserData } from "../hooks/useAuth";
 
-export default function ProductFormScreen({ route, navigation }) {
+export default function ProductFormScreen({ navigation, route }) {
   const { product, mode } = route.params || {};
   const isEditMode = mode === "edit";
 
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [description, setDescription] = useState("");
-  const [categoryName, setCategoryName] = useState("");
-  const [image, setImage] = useState(null);
-  const [imageUrl, setImageUrl] = useState("");
+  const [formData, setFormData] = useState({
+    name: "",
+    price: "",
+    description: "",
+    categoryName: "",
+    image: null,
+  });
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
+    loadUserData();
     if (isEditMode && product) {
-      setName(product.name || "");
-      setPrice(product.price?.toString() || "");
-      setDescription(product.description || "");
-      setCategoryName(product.categoryName || "");
-      setImageUrl(product.imageUrl || "");
+      setFormData({
+        name: product.name || "",
+        price: product.price?.toString() || "",
+        description: product.description || "",
+        categoryName: product.categoryName || "",
+        image: product.imageUrl ? { uri: product.imageUrl } : null,
+      });
     }
-  }, [product, isEditMode]);
+  }, []);
 
-  const requestPermissions = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permiso denegado",
-        "Necesitamos permiso para acceder a tus fotos"
-      );
+  const loadUserData = async () => {
+    try {
+      const userData = await getUserData();
+      setCurrentUser(userData);
+    } catch (error) {
+      console.error("Error loading user data:", error);
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const image = await pickImage();
+      if (image) {
+        setFormData((prev) => ({ ...prev, image }));
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      
+      if (error.message && error.message.includes('permisos')) {
+        Alert.alert(
+          "Permisos necesarios",
+          "Para agregar fotos, necesitamos acceso a tu galería. Ve a Configuración > Unifood > Fotos y permite el acceso.",
+          [
+            { text: "Cancelar", style: "cancel" },
+            { text: "Abrir Configuración", onPress: () => Linking.openSettings() }
+          ]
+        );
+      } else {
+        Alert.alert("Error", "No se pudo seleccionar la imagen. Intenta de nuevo.");
+      }
+    }
+  };
+
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      Alert.alert("Error", "El nombre del producto es obligatorio");
+      return false;
+    }
+    if (!formData.price || isNaN(formData.price) || parseFloat(formData.price) <= 0) {
+      Alert.alert("Error", "El precio debe ser un número válido mayor a 0");
       return false;
     }
     return true;
   };
 
-  const pickImage = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setImage({
-        uri: result.assets[0].uri,
-        type: result.assets[0].type || "image/jpeg",
-        fileName: result.assets[0].fileName || "product.jpg",
-      });
-    }
-  };
-
-  const validateFields = () => {
-    const newErrors = {};
-    let isValid = true;
-
-    if (!name.trim()) {
-      newErrors.name = "El nombre es obligatorio.";
-      isValid = false;
-    }
-
-    if (!price.trim()) {
-      newErrors.price = "El precio es obligatorio.";
-      isValid = false;
-    } else if (isNaN(price) || parseFloat(price) <= 0) {
-      newErrors.price = "El precio debe ser un número mayor a 0.";
-      isValid = false;
-    }
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
   const handleSubmit = async () => {
-    if (!validateFields()) return;
+    if (!validateForm()) return;
 
-    const productData = {
-      name: name.trim(),
-      price: parseFloat(price),
-      description: description.trim(),
-      categoryName: categoryName.trim(),
-    };
-
-    if (image) {
-      productData.image = image;
-    } else if (isEditMode && imageUrl) {
-      productData.imageUrl = imageUrl;
+    if (!currentUser) {
+      Alert.alert("Error", "No se pudo obtener la información del usuario");
+      return;
     }
+
+    setLoading(true);
 
     try {
-      setLoading(true);
-      let response;
+      const productData = {
+        name: formData.name.trim(),
+        price: parseFloat(formData.price),
+        description: formData.description.trim(),
+        categoryName: formData.categoryName.trim(),
+        image: formData.image,
+        userId: currentUser.userId || currentUser.id,
+      };
 
+      // Obtener el número de teléfono del usuario
+      const userPhone = currentUser.phoneNumber || currentUser.phone;
+
+      let response;
       if (isEditMode) {
-        response = await updateProduct(product.productId, productData);
+        response = await updateProduct(product.productId, productData, userPhone);
       } else {
-        response = await createProduct(productData);
+        response = await createProduct(productData, userPhone);
       }
 
       if (response.isSuccess) {
@@ -128,218 +134,288 @@ export default function ProductFormScreen({ route, navigation }) {
           ]
         );
       } else {
-        Alert.alert(
-          "Error",
-          response.message || `No se pudo ${isEditMode ? "actualizar" : "crear"} el producto`
-        );
+        Alert.alert("Error", response.message || "No se pudo guardar el producto");
       }
     } catch (error) {
+      console.error("Error al guardar producto:", error);
       Alert.alert("Error", "Ocurrió un problema al guardar el producto");
-      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>← Volver</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>
-          {isEditMode ? "Editar Producto" : "Nuevo Producto"}
-        </Text>
-      </View>
+  const getImageUri = () => {
+    if (formData.image) {
+      if (formData.image.uri) {
+        // Si es una nueva imagen seleccionada o una existente con URI completa
+        if (formData.image.uri.startsWith('http')) {
+          return formData.image.uri;
+        } else if (formData.image.uri.startsWith('/')) {
+          return `https://product-microservice-cwk6.onrender.com${formData.image.uri}`;
+        } else {
+          return formData.image.uri;
+        }
+      }
+    }
+    return null;
+  };
 
-      <View style={styles.form}>
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.cancelText}>Cancelar</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>
+            {isEditMode ? "Editar Producto" : "Nuevo Producto"}
+          </Text>
+          <View style={{ width: 80 }} />
+        </View>
+
         {/* Imagen */}
-        <View style={styles.imageContainer}>
-          {image?.uri || imageUrl ? (
+        <TouchableOpacity
+          style={styles.imageContainer}
+          onPress={handlePickImage}
+          activeOpacity={0.8}
+        >
+          {getImageUri() ? (
             <Image
-              source={{
-                uri: image?.uri || `https://product-microservice-cwk6.onrender.com${imageUrl}`,
-              }}
-              style={styles.imagePreview}
+              source={{ uri: getImageUri() }}
+              style={styles.image}
               resizeMode="cover"
             />
           ) : (
-            <View style={styles.noImagePreview}>
-              <Text style={styles.noImageText}>Sin imagen</Text>
+            <View style={styles.imagePlaceholder}>
+              <Text style={styles.imagePlaceholderIcon}>📷</Text>
+              <Text style={styles.imagePlaceholderText}>
+                Toca para {isEditMode ? "cambiar" : "agregar"} foto
+              </Text>
             </View>
           )}
-          <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-            <Text style={styles.imageButtonText}>
-              {image || imageUrl ? "Cambiar Imagen" : "Seleccionar Imagen"}
-            </Text>
+        </TouchableOpacity>
+
+        {/* Formulario */}
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Nombre del producto *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ej: Pizza Margarita"
+              value={formData.name}
+              onChangeText={(value) => handleInputChange("name", value)}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Precio *</Text>
+            <View style={styles.priceInputContainer}>
+              <Text style={styles.currencySymbol}>$</Text>
+              <TextInput
+                style={styles.priceInput}
+                placeholder="0.00"
+                value={formData.price}
+                onChangeText={(value) => handleInputChange("price", value)}
+                keyboardType="numeric"
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Categoría</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ej: Comida Rápida"
+              value={formData.categoryName}
+              onChangeText={(value) => handleInputChange("categoryName", value)}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Descripción</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Describe tu producto..."
+              value={formData.description}
+              onChangeText={(value) => handleInputChange("description", value)}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          {/* Información del usuario */}
+          {currentUser && (
+            <View style={styles.userInfoContainer}>
+              <Text style={styles.userInfoLabel}>📱 Contacto</Text>
+              <Text style={styles.userInfoText}>
+                {currentUser.phoneNumber || currentUser.phone || "Sin número registrado"}
+              </Text>
+              <Text style={styles.userInfoSubtext}>
+                Los compradores podrán contactarte por WhatsApp
+              </Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>
+                {isEditMode ? "Guardar Cambios" : "Publicar Producto"}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
-
-        {/* Nombre */}
-        <Text style={styles.label}>Nombre del Producto *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej: iPhone 16"
-          value={name}
-          onChangeText={setName}
-        />
-        {errors.name && <Text style={styles.error}>{errors.name}</Text>}
-
-        {/* Precio */}
-        <Text style={styles.label}>Precio *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej: 100000"
-          value={price}
-          onChangeText={setPrice}
-          keyboardType="numeric"
-        />
-        {errors.price && <Text style={styles.error}>{errors.price}</Text>}
-
-        {/* Categoría */}
-        <Text style={styles.label}>Categoría</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej: Celulares"
-          value={categoryName}
-          onChangeText={setCategoryName}
-        />
-
-        {/* Descripción */}
-        <Text style={styles.label}>Descripción</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Descripción del producto..."
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
-
-        {/* Botón Guardar */}
-        <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>
-              {isEditMode ? "Actualizar Producto" : "Crear Producto"}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#fff",
+  },
+  scrollContent: {
+    paddingBottom: 30,
   },
   header: {
-    backgroundColor: "#fff",
-    padding: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
     paddingTop: 50,
+    paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
   },
-  backButton: {
-    marginBottom: 10,
-  },
-  backButtonText: {
+  cancelText: {
     fontSize: 16,
     color: "#3CB371",
-    fontWeight: "600",
+    width: 80,
   },
   title: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#333",
+  },
+  imageContainer: {
+    width: "100%",
+    height: 300,
+    backgroundColor: "#f5f5f5",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  imagePlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imagePlaceholderIcon: {
+    fontSize: 60,
+    marginBottom: 10,
+  },
+  imagePlaceholderText: {
+    fontSize: 16,
+    color: "#999",
   },
   form: {
     padding: 20,
   },
-  imageContainer: {
-    alignItems: "center",
+  inputGroup: {
     marginBottom: 20,
   },
-  imagePreview: {
-    width: "100%",
-    height: 250,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  noImagePreview: {
-    width: "100%",
-    height: 250,
-    borderRadius: 10,
-    backgroundColor: "#e0e0e0",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  noImageText: {
-    color: "#999",
-    fontSize: 16,
-  },
-  imageButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  imageButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 14,
-  },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     color: "#333",
     marginBottom: 8,
-    marginTop: 10,
   },
   input: {
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#3CB371",
+    borderColor: "#e0e0e0",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    marginBottom: 5,
+    color: "#333",
+    backgroundColor: "#fff",
+  },
+  priceInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+  },
+  currencySymbol: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#3CB371",
+    paddingLeft: 12,
+  },
+  priceInput: {
+    flex: 1,
+    padding: 12,
+    fontSize: 16,
+    color: "#333",
   },
   textArea: {
     height: 100,
     paddingTop: 12,
   },
-  error: {
-    color: "#f44336",
-    fontSize: 13,
-    marginBottom: 8,
+  userInfoContainer: {
+    backgroundColor: "#f0f9f4",
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderLeftWidth: 3,
+    borderLeftColor: "#3CB371",
+  },
+  userInfoLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 5,
+  },
+  userInfoText: {
+    fontSize: 16,
+    color: "#3CB371",
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  userInfoSubtext: {
+    fontSize: 12,
+    color: "#666",
   },
   submitButton: {
     backgroundColor: "#3CB371",
-    paddingVertical: 15,
+    padding: 16,
     borderRadius: 8,
     alignItems: "center",
-    marginTop: 20,
-    marginBottom: 40,
+    marginTop: 10,
   },
   submitButtonDisabled: {
-    backgroundColor: "#a0d4b4",
+    backgroundColor: "#9cc9b3",
   },
   submitButtonText: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
   },
 });
