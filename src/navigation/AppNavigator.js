@@ -10,6 +10,7 @@ import RegisterScreen from "../views/RegisterScreen";
 import ProductsListScreen from "../views/ProductsListScreen";
 import ProductFormScreen from "../views/ProductFormScreen";
 import { getUserSession } from "../hooks/useAuth";
+import AdminHome from "../views/AdminHomeScreen"; 
 
 const Stack = createStackNavigator();
 
@@ -43,6 +44,8 @@ export default function AppNavigator() {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="ProductsList" component={ProductsListScreen} />
         <Stack.Screen name="ProductForm" component={ProductFormScreen} />
+        <Stack.Screen name="AdminHome" component={AdminHome} /> 
+     
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -1,6 +1,14 @@
 // src/screens/LoginScreen.js
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+} from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loginUser } from "../services/api";
 
 export default function LoginScreen({ navigation }) {
@@ -9,23 +17,42 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     if (!userName || !password) {
-  Alert.alert("Error", "Por favor ingresa tu correo y contraseña.");
-  return;
-}
-
+      Alert.alert("Error", "Por favor ingresa tu correo y contraseña.");
+      return;
+    }
 
     try {
       const response = await loginUser({ userName, password });
 
       if (response.isSuccess) {
-        // Guardar token y datos del usuario
-        const { token, user } = response.result;
+        const { user, token } = response.result;
 
-        // Puedes guardarlo con AsyncStorage si quieres persistencia
-        // await AsyncStorage.setItem("token", token);
+        // ✅ Validar estatus
+        if (user.status === 2) {
+          Alert.alert("Cuenta no disponible", "Esta cuenta no existe o está inactiva.");
+          return;
+        }
 
-        Alert.alert("Bienvenido", `Hola, ${user.name}!`);
-        navigation.replace("Home"); // Redirigir al Home
+        if (user.status === 1) {
+          // ✅ Guardar token y usuario en AsyncStorage
+          await AsyncStorage.setItem("token", token);
+          await AsyncStorage.setItem("user", JSON.stringify(user));
+
+          // ✅ Guardar hora de expiración (1 hora)
+          const expirationTime = Date.now() + 3600 * 1000; // 1 hora
+          await AsyncStorage.setItem("session_expiration", expirationTime.toString());
+
+          // ✅ Redirigir según rol
+          if (user.roles.includes("ADMIN")) {
+            Alert.alert("Bienvenido", `Hola, ${user.name}!`);
+            navigation.replace("AdminHome"); // tu pantalla para admin
+          } else if (user.roles.includes("CLIENTE")) {
+            Alert.alert("Bienvenido", `Hola, ${user.name}!`);
+            navigation.replace("Home"); // tu pantalla para usuario normal
+          } else {
+            Alert.alert("Error", "Rol de usuario no reconocido.");
+          }
+        }
       } else {
         Alert.alert("Error", response.message || "Credenciales incorrectas");
       }
@@ -39,11 +66,12 @@ export default function LoginScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.title}>Iniciar Sesión</Text>
 
-       <TextInput
+      <TextInput
         style={styles.input}
         placeholder="Correo electrónico"
         value={userName}
         onChangeText={setUserName}
+        autoCapitalize="none"
       />
       <TextInput
         style={styles.input}
@@ -56,6 +84,7 @@ export default function LoginScreen({ navigation }) {
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Ingresar</Text>
       </TouchableOpacity>
+
       {/* Texto para registrarse */}
       <View style={styles.registerContainer}>
         <Text style={styles.registerText}>¿No tienes cuenta?</Text>
@@ -63,54 +92,53 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.registerLink}> Regístrate</Text>
         </TouchableOpacity>
       </View>
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center", 
-    padding: 20, 
-    backgroundColor: "#fff" 
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#fff",
   },
-  title: { 
-    fontSize: 26, 
-    fontWeight: "bold", 
-    marginBottom: 20 
+  title: {
+    fontSize: 26,
+    fontWeight: "bold",
+    marginBottom: 20,
   },
-  input: { 
-    width: "100%", 
-    borderWidth: 1, 
-    borderColor: "#ccc", 
-    borderRadius: 8, 
-    padding: 10, 
-    marginBottom: 15 
+  input: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
   },
-  button: { 
-    backgroundColor: "#4CAF50", 
-    padding: 12, 
-    borderRadius: 8, 
-    width: "100%", 
-    alignItems: "center" 
+  button: {
+    backgroundColor: "#4CAF50",
+    padding: 12,
+    borderRadius: 8,
+    width: "100%",
+    alignItems: "center",
   },
-  buttonText: { 
-    color: "#fff", 
-    fontSize: 18 
+  buttonText: {
+    color: "#fff",
+    fontSize: 18,
   },
-  registerContainer: { 
-    flexDirection: "row", 
-    marginTop: 15 
+  registerContainer: {
+    flexDirection: "row",
+    marginTop: 15,
   },
-  registerText: { 
-    fontSize: 16, 
-    color: "#333" 
+  registerText: {
+    fontSize: 16,
+    color: "#333",
   },
-  registerLink: { 
-    fontSize: 16, 
-    color: "#00b229ed", 
-    fontWeight: "bold" 
+  registerLink: {
+    fontSize: 16,
+    color: "#00b229ed",
+    fontWeight: "bold",
   },
 });
