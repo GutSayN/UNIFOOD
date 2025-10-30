@@ -11,6 +11,7 @@ import {
   Image,
   RefreshControl,
   Linking,
+  Platform,
 } from "react-native";
 import { getAllProducts } from "../services/productService";
 import { getUserData, clearUserSession } from "../hooks/useAuth";
@@ -27,6 +28,7 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      console.log("🔄 HomeScreen enfocado - recargando productos");
       loadProducts();
     });
     return unsubscribe;
@@ -55,9 +57,11 @@ export default function HomeScreen({ navigation }) {
 
   const loadProducts = async () => {
     try {
+      console.log("📥 Cargando productos...");
       const response = await getAllProducts();
       
       if (response.isSuccess && response.result) {
+        console.log("✅ Productos cargados:", response.result.length);
         setProducts(response.result);
       } else {
         setProducts([]);
@@ -93,7 +97,6 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleWhatsApp = (product) => {
-    // ✅ Verificar que el producto tenga userPhone
     if (!product.userPhone) {
       Alert.alert(
         "Sin contacto",
@@ -102,30 +105,26 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
-    // ✅ Limpiar el número de teléfono (quitar espacios, guiones, etc.)
-    const phoneNumber = product.userPhone.replace(/[^\d+]/g, '');
+    // ✅ Limpiar y formatear número correctamente
+    let phoneNumber = product.userPhone.replace(/[^\d]/g, ''); // Solo dígitos
     
-    // ✅ Construir mensaje para WhatsApp
+    // Si el número no tiene código de país, agregar +52 (México)
+    if (!phoneNumber.startsWith('521') && phoneNumber.length === 10) {
+      phoneNumber = '52' + phoneNumber;
+    }
+    
     const message = `Hola! Estoy interesado en tu producto: ${product.name} - $${product.price}`;
-    const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
 
     console.log("📱 Abriendo WhatsApp:", whatsappUrl);
 
-    Linking.canOpenURL(whatsappUrl)
-      .then((supported) => {
-        if (supported) {
-          return Linking.openURL(whatsappUrl);
-        } else {
-          Alert.alert(
-            "WhatsApp no disponible",
-            "No se pudo abrir WhatsApp. ¿Lo tienes instalado?"
-          );
-        }
-      })
-      .catch((err) => {
-        console.error("Error al abrir WhatsApp:", err);
-        Alert.alert("Error", "No se pudo abrir WhatsApp");
-      });
+    Linking.openURL(whatsappUrl).catch((err) => {
+      console.error("Error al abrir WhatsApp:", err);
+      Alert.alert(
+        "Error",
+        "No se pudo abrir WhatsApp. Verifica que esté instalado."
+      );
+    });
   };
 
   const isMyProduct = (product) => {
@@ -138,7 +137,6 @@ export default function HomeScreen({ navigation }) {
 
     return (
       <View style={styles.productCard}>
-        {/* Header con info del vendedor */}
         <View style={styles.productHeader}>
           <View style={styles.sellerInfo}>
             <View style={styles.sellerAvatar}>
@@ -146,7 +144,7 @@ export default function HomeScreen({ navigation }) {
                 {item.userName ? item.userName.charAt(0).toUpperCase() : '?'}
               </Text>
             </View>
-            <View>
+            <View style={styles.sellerDetails}>
               <Text style={styles.sellerName}>
                 {item.userName || "Usuario Anónimo"}
               </Text>
@@ -155,21 +153,8 @@ export default function HomeScreen({ navigation }) {
               )}
             </View>
           </View>
-          
-          {/* Solo mostrar botón de editar si es mi producto */}
-          {isOwner && (
-            <TouchableOpacity
-              style={styles.editIconButton}
-              onPress={() =>
-                navigation.navigate("ProductForm", { product: item, mode: "edit" })
-              }
-            >
-              <Text style={styles.editIcon}>✏️</Text>
-            </TouchableOpacity>
-          )}
         </View>
 
-        {/* Imagen del producto */}
         {item.imageUrl ? (
           <Image
             source={{ 
@@ -184,32 +169,32 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
 
-        {/* Información del producto */}
         <View style={styles.productInfo}>
+          <View style={styles.priceRow}>
+            <Text style={styles.productPrice}>${item.price.toLocaleString()}</Text>
+            {isOwner && (
+              <View style={styles.ownerBadgeInline}>
+                <Text style={styles.ownerBadgeInlineText}>Tu producto</Text>
+              </View>
+            )}
+          </View>
+
           <Text style={styles.productName}>{item.name}</Text>
-          <Text style={styles.productPrice}>${item.price.toLocaleString()}</Text>
           
           {item.description && (
-            <Text style={styles.productDescription} numberOfLines={3}>
+            <Text style={styles.productDescription} numberOfLines={2}>
               {item.description}
             </Text>
           )}
 
-          {/* Botón de WhatsApp - visible para todos menos el dueño */}
           {!isOwner && (
             <TouchableOpacity
               style={styles.whatsappButton}
               onPress={() => handleWhatsApp(item)}
             >
-              <Text style={styles.whatsappButtonText}>💬 Contactar vendedor</Text>
+              <Text style={styles.whatsappIcon}>💬</Text>
+              <Text style={styles.whatsappButtonText}>Contactar vendedor</Text>
             </TouchableOpacity>
-          )}
-
-          {/* Mensaje para el dueño */}
-          {isOwner && (
-            <View style={styles.ownerBadge}>
-              <Text style={styles.ownerBadgeText}>📌 Tu producto</Text>
-            </View>
           )}
         </View>
       </View>
@@ -227,7 +212,6 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Unifood</Text>
         <View style={styles.headerButtons}>
@@ -235,31 +219,24 @@ export default function HomeScreen({ navigation }) {
             style={styles.headerButton}
             onPress={() => navigation.navigate("ProductsList")}
           >
-            <Text style={styles.headerButtonText}>Mis Productos</Text>
+            <Text style={styles.headerButtonIcon}>📦</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.logoutButton}
+            style={styles.headerButton}
             onPress={handleLogout}
           >
-            <Text style={styles.logoutButtonText}>Salir</Text>
+            <Text style={styles.headerButtonIcon}>🚪</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Lista de productos */}
       {products.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>🍽️</Text>
           <Text style={styles.emptyText}>No hay productos disponibles</Text>
           <Text style={styles.emptySubtext}>
-            Sé el primero en publicar algo
+            Aún no hay productos publicados
           </Text>
-          <TouchableOpacity
-            style={styles.addFirstButton}
-            onPress={() => navigation.navigate("ProductForm", { mode: "create" })}
-          >
-            <Text style={styles.addFirstButtonText}>+ Publicar producto</Text>
-          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -272,20 +249,11 @@ export default function HomeScreen({ navigation }) {
               refreshing={refreshing}
               onRefresh={onRefresh}
               colors={["#3CB371"]}
+              tintColor="#3CB371"
             />
           }
           showsVerticalScrollIndicator={false}
         />
-      )}
-
-      {/* Botón flotante para agregar producto */}
-      {products.length > 0 && (
-        <TouchableOpacity
-          style={styles.floatingButton}
-          onPress={() => navigation.navigate("ProductForm", { mode: "create" })}
-        >
-          <Text style={styles.floatingButtonText}>+</Text>
-        </TouchableOpacity>
       )}
     </View>
   );
@@ -294,219 +262,201 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#3CB371", // ✅ Fondo verde
   },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#3CB371", // ✅ Fondo verde
   },
   header: {
     backgroundColor: "#fff",
     paddingHorizontal: 20,
     paddingTop: 50,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    paddingBottom: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#dbdbdb",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "bold",
-    color: "#3CB371",
+    color: "#3CB371", // ✅ Verde
   },
   headerButtons: {
     flexDirection: "row",
-    gap: 10,
+    gap: 15,
   },
   headerButton: {
-    backgroundColor: "#3CB371",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#3CB371", // ✅ Verde
+    justifyContent: "center",
+    alignItems: "center",
   },
-  headerButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  logoutButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  logoutButtonText: {
-    color: "#f44336",
-    fontWeight: "600",
-    fontSize: 14,
+  headerButtonIcon: {
+    fontSize: 18,
   },
   listContent: {
-    paddingBottom: 80,
+    paddingBottom: 20,
   },
   productCard: {
     backgroundColor: "#fff",
-    marginBottom: 2,
+    marginBottom: 10,
+    borderRadius: 12,
+    marginHorizontal: 10,
+    marginTop: 10,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   productHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 15,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
   },
   sellerInfo: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
   },
   sellerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#3CB371",
     justifyContent: "center",
     alignItems: "center",
   },
   sellerAvatarText: {
     color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  sellerDetails: {
+    justifyContent: "center",
   },
   sellerName: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#262626",
   },
   categoryText: {
-    fontSize: 12,
-    color: "#666",
-  },
-  editIconButton: {
-    padding: 5,
-  },
-  editIcon: {
-    fontSize: 20,
+    fontSize: 11,
+    color: "#8e8e8e",
+    marginTop: 2,
   },
   productImage: {
     width: "100%",
-    height: 400,
-    backgroundColor: "#f0f0f0",
+    height: 375,
+    backgroundColor: "#f5f5f5",
   },
   noImage: {
     width: "100%",
-    height: 400,
-    backgroundColor: "#e0e0e0",
+    height: 375,
+    backgroundColor: "#efefef",
     justifyContent: "center",
     alignItems: "center",
   },
   noImageText: {
-    fontSize: 80,
+    fontSize: 60,
+    opacity: 0.5,
   },
   productInfo: {
-    padding: 15,
+    paddingHorizontal: 15,
+    paddingTop: 12,
+    paddingBottom: 15,
   },
-  productName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 5,
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
   productPrice: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 22,
+    fontWeight: "700",
     color: "#3CB371",
-    marginBottom: 10,
+  },
+  ownerBadgeInline: {
+    backgroundColor: "#e8f5e9",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  ownerBadgeInlineText: {
+    color: "#2e7d32",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#262626",
+    marginBottom: 6,
   },
   productDescription: {
     fontSize: 14,
-    color: "#666",
-    lineHeight: 20,
-    marginBottom: 15,
+    color: "#8e8e8e",
+    lineHeight: 18,
+    marginBottom: 12,
   },
   whatsappButton: {
     backgroundColor: "#25D366",
-    padding: 12,
-    borderRadius: 8,
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  whatsappIcon: {
+    fontSize: 18,
   },
   whatsappButtonText: {
     color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  ownerBadge: {
-    backgroundColor: "#f0f9f4",
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: "#3CB371",
-  },
-  ownerBadgeText: {
-    color: "#3CB371",
     fontWeight: "600",
-    textAlign: "center",
+    fontSize: 15,
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 16,
-    color: "#666",
+    fontSize: 14,
+    color: "#fff", // ✅ Blanco para fondo verde
   },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 40,
+    backgroundColor: "#3CB371", // ✅ Fondo verde
   },
   emptyIcon: {
     fontSize: 80,
     marginBottom: 20,
+    opacity: 0.8,
   },
   emptyText: {
     fontSize: 20,
-    fontWeight: "bold",
-    color: "#666",
-    marginBottom: 10,
+    fontWeight: "600",
+    color: "#fff", // ✅ Blanco
+    marginBottom: 8,
     textAlign: "center",
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#999",
+    color: "#e0f2e9", // ✅ Verde claro
     textAlign: "center",
-    marginBottom: 20,
-  },
-  addFirstButton: {
-    backgroundColor: "#3CB371",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  addFirstButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  floatingButton: {
-    position: "absolute",
-    bottom: 20,
-    right: 20,
-    backgroundColor: "#3CB371",
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
-  },
-  floatingButtonText: {
-    color: "#fff",
-    fontSize: 32,
-    fontWeight: "bold",
+    marginBottom: 24,
   },
 });

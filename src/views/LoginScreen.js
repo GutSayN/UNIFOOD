@@ -41,7 +41,7 @@ export default function LoginScreen({ navigation }) {
           if (user.roles.includes("ADMIN")) {
             Alert.alert("Bienvenido", `Hola, ${user.name}!`);
             navigation.replace("AdminHome");
-          } else if (user.roles.includes("CLIENTE")) {
+           } else if (user.roles.includes("USER")) {
             Alert.alert("Bienvenido", `Hola, ${user.name}!`);
             navigation.replace("Home");
           } else {

@@ -69,7 +69,7 @@ const RegisterScreen = ({ navigation }) => {
       name,
       phoneNumber,
       password,
-      role: null,
+      role: "USER",
     };
 
     try {

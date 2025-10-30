@@ -1,8 +1,54 @@
 // src/services/productService.js
 const PRODUCT_API_URL = "https://product-microservice-cwk6.onrender.com/api/product";
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Obtener todos los productos
+// Cache para usuarios
+const userCache = {};
+
+// Función para obtener datos de un usuario por ID
+const getUserById = async (userId) => {
+  if (userCache[userId]) {
+    return userCache[userId];
+  }
+
+  try {
+    const userData = await AsyncStorage.getItem("userData");
+    if (userData) {
+      const user = JSON.parse(userData);
+      if (user.id === userId) {
+        const userInfo = {
+          name: user.name || "Usuario Anónimo",
+          phoneNumber: user.phoneNumber || null,
+        };
+        userCache[userId] = userInfo;
+        return userInfo;
+      }
+    }
+
+    return {
+      name: "Usuario Anónimo",
+      phoneNumber: null,
+    };
+  } catch (error) {
+    return {
+      name: "Usuario Anónimo",
+      phoneNumber: null,
+    };
+  }
+};
+
+// Enriquecer un producto con datos del usuario
+const enrichProduct = async (product) => {
+  const userData = await getUserById(product.userId);
+  return {
+    ...product,
+    userName: userData.name,
+    userPhone: userData.phoneNumber,
+  };
+};
+
+// Obtener todos los productos CON datos de usuario
 export const getAllProducts = async () => {
   try {
     const response = await fetch(`${PRODUCT_API_URL}/GetAll`, {
@@ -12,9 +58,20 @@ export const getAllProducts = async () => {
       },
     });
     const result = await response.json();
+    
+    if (result.isSuccess && result.result) {
+      const enrichedProducts = await Promise.all(
+        result.result.map(product => enrichProduct(product))
+      );
+      
+      return {
+        ...result,
+        result: enrichedProducts,
+      };
+    }
+    
     return result;
   } catch (error) {
-    console.error("Error al obtener productos:", error);
     throw error;
   }
 };
@@ -29,9 +86,17 @@ export const getProductById = async (id) => {
       },
     });
     const result = await response.json();
+    
+    if (result.isSuccess && result.result) {
+      const enrichedProduct = await enrichProduct(result.result);
+      return {
+        ...result,
+        result: enrichedProduct,
+      };
+    }
+    
     return result;
   } catch (error) {
-    console.error("Error al obtener producto:", error);
     throw error;
   }
 };
@@ -46,24 +111,33 @@ export const getProductsByUserId = async (userId) => {
       },
     });
     const result = await response.json();
+    
+    if (result.isSuccess && result.result) {
+      const enrichedProducts = await Promise.all(
+        result.result.map(product => enrichProduct(product))
+      );
+      
+      return {
+        ...result,
+        result: enrichedProducts,
+      };
+    }
+    
     return result;
   } catch (error) {
-    console.error("Error al obtener productos del usuario:", error);
     throw error;
   }
 };
 
 // Crear nuevo producto
-export const createProduct = async (productData, userPhone = null) => {
+export const createProduct = async (productData) => {
   try {
     const formData = new FormData();
     
-    // ✅ Campos requeridos según tu API
     formData.append("name", productData.name);
     formData.append("price", productData.price.toString());
-    formData.append("userId", productData.userId); // ← Requerido
+    formData.append("userId", productData.userId);
     
-    // ✅ Campos opcionales
     if (productData.description && productData.description.trim()) {
       formData.append("description", productData.description);
     }
@@ -72,63 +146,46 @@ export const createProduct = async (productData, userPhone = null) => {
       formData.append("categoryName", productData.categoryName);
     }
     
-    // ✅ Agregar imagen si existe
     if (productData.image && productData.image.uri) {
       const imageUri = productData.image.uri;
-      
-      // Obtener extensión del archivo
       const uriParts = imageUri.split('.');
       const fileType = uriParts[uriParts.length - 1];
       
-      const imageFile = {
+      formData.append("image", {
         uri: imageUri,
         name: `product_${Date.now()}.${fileType}`,
         type: `image/${fileType}`,
-      };
-      
-      formData.append("image", imageFile);
+      });
     }
-
-    console.log("📤 Enviando producto:", {
-      name: productData.name,
-      price: productData.price,
-      userId: productData.userId,
-      hasImage: !!productData.image
-    });
 
     const response = await fetch(PRODUCT_API_URL, {
       method: "POST",
       headers: {
         "Accept": "*/*",
-        // NO incluir Content-Type cuando usas FormData
       },
       body: formData,
     });
 
     const responseText = await response.text();
-    console.log("📥 Respuesta del servidor:", responseText);
 
     if (!response.ok) {
-      throw new Error(`Error del servidor: ${response.status} - ${responseText}`);
+      throw new Error(`Error ${response.status}: ${responseText}`);
     }
 
-    const result = JSON.parse(responseText);
-    return result;
+    return JSON.parse(responseText);
     
   } catch (error) {
-    console.error("❌ Error completo:", error);
     throw error;
   }
 };
 
-// Actualizar producto existente
-export const updateProduct = async (id, productData, userPhone = null) => {
+// Actualizar producto
+export const updateProduct = async (id, productData) => {
   try {
     const formData = new FormData();
     
     formData.append("name", productData.name);
     formData.append("price", productData.price.toString());
-    formData.append("userId", productData.userId); // ← Requerido
     
     if (productData.description && productData.description.trim()) {
       formData.append("description", productData.description);
@@ -138,21 +195,20 @@ export const updateProduct = async (id, productData, userPhone = null) => {
       formData.append("categoryName", productData.categoryName);
     }
     
-    if (productData.image && productData.image.uri && !productData.image.uri.startsWith('http')) {
+    if (productData.image && productData.image.uri) {
       const imageUri = productData.image.uri;
-      const uriParts = imageUri.split('.');
-      const fileType = uriParts[uriParts.length - 1];
       
-      const imageFile = {
-        uri: imageUri,
-        name: `product_${Date.now()}.${fileType}`,
-        type: `image/${fileType}`,
-      };
-      
-      formData.append("image", imageFile);
+      if (!imageUri.startsWith('http') && !imageUri.startsWith('/')) {
+        const uriParts = imageUri.split('.');
+        const fileType = uriParts[uriParts.length - 1];
+        
+        formData.append("image", {
+          uri: imageUri,
+          name: `product_${Date.now()}.${fileType}`,
+          type: `image/${fileType}`,
+        });
+      }
     }
-    
-    console.log("📤 Actualizando producto:", id);
     
     const response = await fetch(`${PRODUCT_API_URL}/${id}`, {
       method: "PUT",
@@ -163,17 +219,14 @@ export const updateProduct = async (id, productData, userPhone = null) => {
     });
 
     const responseText = await response.text();
-    console.log("📥 Respuesta del servidor:", responseText);
 
     if (!response.ok) {
-      throw new Error(`Error del servidor: ${response.status} - ${responseText}`);
+      throw new Error(`Error ${response.status}: ${responseText}`);
     }
 
-    const result = JSON.parse(responseText);
-    return result;
+    return JSON.parse(responseText);
     
   } catch (error) {
-    console.error("❌ Error al actualizar:", error);
     throw error;
   }
 };
@@ -190,7 +243,6 @@ export const deleteProduct = async (id) => {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error("Error al eliminar producto:", error);
     throw error;
   }
 };
@@ -205,7 +257,7 @@ export const pickImage = async () => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], // ✅ Corregido: usar array en lugar de ImagePicker.MediaTypeOptions
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -222,7 +274,6 @@ export const pickImage = async () => {
     
     return null;
   } catch (error) {
-    console.error('Error al seleccionar imagen:', error);
     throw error;
   }
 };

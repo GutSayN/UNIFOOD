@@ -13,8 +13,69 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { Picker } from '@react-native-picker/picker';
 import { createProduct, updateProduct, pickImage } from "../services/productService";
 import { getUserData } from "../hooks/useAuth";
+
+// ✅ CATEGORÍAS AMPLIADAS
+const CATEGORIAS = [
+  "Selecciona una categoría",
+  // Alimentos y Bebidas
+  "🍕 Comida Rápida",
+  "🌮 Comida Mexicana",
+  "🍝 Comida Internacional",
+  "🍰 Postres y Repostería",
+  "☕ Bebidas",
+  "🍿 Snacks",
+  "🥗 Saludable",
+  "🌱 Vegetariano/Vegano",
+  // Electrónica
+  "📱 Celulares y Tablets",
+  "💻 Computadoras",
+  "🎮 Videojuegos",
+  "📷 Cámaras y Fotografía",
+  "🎧 Audio y Audífonos",
+  "⌚ Smartwatches",
+  // Moda y Accesorios
+  "👕 Ropa Hombre",
+  "👗 Ropa Mujer",
+  "👟 Zapatos",
+  "👜 Bolsos y Carteras",
+  "⌚ Relojes",
+  "💍 Joyería y Accesorios",
+  // Hogar y Decoración
+  "🏠 Muebles",
+  "🛋️ Decoración",
+  "🍳 Cocina y Comedor",
+  "🛏️ Dormitorio",
+  "🌿 Plantas y Jardín",
+  // Deportes y Fitness
+  "⚽ Deportes",
+  "🏋️ Fitness y Gym",
+  "🚴 Bicicletas",
+  "🏃 Running",
+  // Vehículos
+  "🚗 Autos",
+  "🏍️ Motos",
+  "🚲 Bicicletas",
+  "🛴 Patinetas",
+  // Libros y Educación
+  "📚 Libros",
+  "📝 Material Escolar",
+  "🎨 Arte y Manualidades",
+  // Servicios
+  "🔧 Servicios Técnicos",
+  "🏠 Servicios para el Hogar",
+  "👨‍🏫 Clases y Tutorías",
+  "💼 Servicios Profesionales",
+  // Mascotas
+  "🐕 Mascotas y Accesorios",
+  "🐾 Comida para Mascotas",
+  // Otros
+  "🎁 Regalos",
+  "🎉 Eventos y Fiestas",
+  "📦 Otro",
+];
 
 export default function ProductFormScreen({ navigation, route }) {
   const { product, mode } = route.params || {};
@@ -24,7 +85,7 @@ export default function ProductFormScreen({ navigation, route }) {
     name: "",
     price: "",
     description: "",
-    categoryName: "",
+    categoryName: CATEGORIAS[0],
     image: null,
   });
   const [loading, setLoading] = useState(false);
@@ -37,7 +98,7 @@ export default function ProductFormScreen({ navigation, route }) {
         name: product.name || "",
         price: product.price?.toString() || "",
         description: product.description || "",
-        categoryName: product.categoryName || "",
+        categoryName: product.categoryName || CATEGORIAS[0],
         image: product.imageUrl ? { uri: product.imageUrl } : null,
       });
     }
@@ -48,7 +109,10 @@ export default function ProductFormScreen({ navigation, route }) {
       const userData = await getUserData();
       setCurrentUser(userData);
     } catch (error) {
-      console.error("Error loading user data:", error);
+      Alert.alert(
+        "Error al cargar usuario",
+        "No se pudo obtener la información del usuario. Por favor intenta de nuevo."
+      );
     }
   };
 
@@ -63,40 +127,132 @@ export default function ProductFormScreen({ navigation, route }) {
         setFormData((prev) => ({ ...prev, image }));
       }
     } catch (error) {
-      console.error('Error picking image:', error);
-      
-      if (error.message && error.message.includes('permisos')) {
-        Alert.alert(
-          "Permisos necesarios",
-          "Para agregar fotos, necesitamos acceso a tu galería. Ve a Configuración > Unifood > Fotos y permite el acceso.",
-          [
-            { text: "Cancelar", style: "cancel" },
-            { text: "Abrir Configuración", onPress: () => Linking.openSettings() }
-          ]
-        );
-      } else {
-        Alert.alert("Error", "No se pudo seleccionar la imagen. Intenta de nuevo.");
-      }
+      Alert.alert(
+        "Error al seleccionar imagen",
+        "No se pudo seleccionar la imagen. Asegúrate de dar permisos a la aplicación para acceder a tus fotos."
+      );
     }
   };
 
   const validateForm = () => {
-    if (!formData.name.trim()) {
-      Alert.alert("Error", "El nombre del producto es obligatorio");
+    // ========== VALIDAR NOMBRE ==========
+    if (!formData.name || !formData.name.trim()) {
+      Alert.alert(
+        "Nombre vacío",
+        "El nombre del producto es obligatorio.\n\nPor favor ingresa un nombre para tu producto."
+      );
       return false;
     }
-    if (!formData.price || isNaN(formData.price) || parseFloat(formData.price) <= 0) {
-      Alert.alert("Error", "El precio debe ser un número válido mayor a 0");
+
+    const trimmedName = formData.name.trim();
+
+    if (trimmedName.length > 25) {
+      Alert.alert(
+        "Nombre muy largo",
+        `El nombre tiene ${trimmedName.length} caracteres.\n\nEl máximo permitido es 25 caracteres.`
+      );
       return false;
     }
+
+    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s]+$/;
+    if (!nameRegex.test(trimmedName)) {
+      Alert.alert(
+        "Nombre inválido",
+        "El nombre solo puede contener letras, números, espacios y acentos.\n\nNo se permiten símbolos especiales."
+      );
+      return false;
+    }
+
+    // ========== VALIDAR PRECIO ==========
+    if (!formData.price || !formData.price.trim()) {
+      Alert.alert(
+        "Precio vacío",
+        "El precio es obligatorio.\n\nPor favor ingresa el precio de tu producto."
+      );
+      return false;
+    }
+
+    const trimmedPrice = formData.price.trim();
+
+    const priceRegex = /^\d+(\.\d{1,2})?$/;
+    if (!priceRegex.test(trimmedPrice)) {
+      Alert.alert(
+        "Precio inválido",
+        "El precio solo puede contener números.\n\nEjemplos válidos: 100, 99.99, 1250.50"
+      );
+      return false;
+    }
+
+    const priceValue = parseFloat(trimmedPrice);
+
+    if (priceValue <= 0) {
+      Alert.alert(
+        "Precio muy bajo",
+        "El precio debe ser mayor a 0."
+      );
+      return false;
+    }
+
+    if (priceValue > 100000) {
+      Alert.alert(
+        "Precio muy alto",
+        `El precio máximo permitido es $100,000.\n\nPrecio ingresado: $${priceValue.toLocaleString()}`
+      );
+      return false;
+    }
+
+    // ========== VALIDAR CATEGORÍA ==========
+    if (!formData.categoryName || formData.categoryName === CATEGORIAS[0]) {
+      Alert.alert(
+        "Categoría no seleccionada",
+        "Debes seleccionar una categoría para tu producto."
+      );
+      return false;
+    }
+
+    // ========== VALIDAR DESCRIPCIÓN ==========
+    if (!formData.description || !formData.description.trim()) {
+      Alert.alert(
+        "Descripción vacía",
+        "La descripción es obligatoria.\n\nPor favor describe tu producto."
+      );
+      return false;
+    }
+
+    const trimmedDesc = formData.description.trim();
+    const words = trimmedDesc.split(/\s+/).filter(w => w.length > 0);
+    const wordCount = words.length;
+
+    if (wordCount > 100) {
+      Alert.alert(
+        "Descripción muy larga",
+        `La descripción tiene ${wordCount} palabras.\n\nEl máximo permitido es 100 palabras.`
+      );
+      return false;
+    }
+
+    const descRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s,\.]+$/;
+    if (!descRegex.test(trimmedDesc)) {
+      Alert.alert(
+        "Descripción inválida",
+        "La descripción solo puede contener letras, números, espacios, acentos, comas y puntos.\n\nNo se permiten otros símbolos especiales."
+      );
+      return false;
+    }
+
     return true;
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
 
     if (!currentUser) {
-      Alert.alert("Error", "No se pudo obtener la información del usuario");
+      Alert.alert(
+        "Error de sesión",
+        "No se pudo obtener la información del usuario.\n\nPor favor cierra sesión e inicia sesión nuevamente."
+      );
       return;
     }
 
@@ -107,38 +263,65 @@ export default function ProductFormScreen({ navigation, route }) {
         name: formData.name.trim(),
         price: parseFloat(formData.price),
         description: formData.description.trim(),
-        categoryName: formData.categoryName.trim(),
+        categoryName: formData.categoryName,
         image: formData.image,
-        userId: currentUser.userId || currentUser.id,
       };
 
-      // Obtener el número de teléfono del usuario
-      const userPhone = currentUser.phoneNumber || currentUser.phone;
+      if (!isEditMode) {
+        productData.userId = currentUser.userId || currentUser.id;
+      }
 
       let response;
       if (isEditMode) {
-        response = await updateProduct(product.productId, productData, userPhone);
+        response = await updateProduct(product.productId, productData);
       } else {
-        response = await createProduct(productData, userPhone);
+        response = await createProduct(productData);
       }
 
       if (response.isSuccess) {
         Alert.alert(
-          "Éxito",
-          `Producto ${isEditMode ? "actualizado" : "creado"} correctamente`,
+          "¡Éxito!",
+          `Tu producto "${productData.name}" ha sido ${isEditMode ? 'actualizado' : 'publicado'} correctamente.`,
           [
             {
-              text: "OK",
-              onPress: () => navigation.goBack(),
+              text: "Ver productos",
+              onPress: () => navigation.navigate("Home"),
             },
           ]
         );
       } else {
-        Alert.alert("Error", response.message || "No se pudo guardar el producto");
+        let errorMessage = "No se pudo guardar el producto.";
+        
+        if (response.message) {
+          if (response.message.includes("price must not be greater than")) {
+            errorMessage = "El precio máximo permitido es $100,000.\n\nPor favor reduce el precio e intenta de nuevo.";
+          } else {
+            errorMessage = response.message;
+          }
+        }
+        
+        Alert.alert(
+          "No se pudo guardar",
+          errorMessage + "\n\nPor favor verifica los datos e intenta de nuevo."
+        );
       }
     } catch (error) {
-      console.error("Error al guardar producto:", error);
-      Alert.alert("Error", "Ocurrió un problema al guardar el producto");
+      let errorMessage = "Ocurrió un problema al guardar el producto.";
+      
+      if (error.message) {
+        if (error.message.includes("Network") || error.message.includes("network")) {
+          errorMessage = "Error de conexión a internet.\n\nVerifica tu conexión e intenta de nuevo.";
+        } else if (error.message.includes("400")) {
+          errorMessage = "Los datos ingresados no son válidos.\n\nRevisa el formulario e intenta de nuevo.";
+        } else if (error.message.includes("price must not be greater than")) {
+          errorMessage = "El precio máximo permitido es $100,000.\n\nPor favor reduce el precio.";
+        }
+      }
+      
+      Alert.alert(
+        "Error al guardar",
+        errorMessage
+      );
     } finally {
       setLoading(false);
     }
@@ -147,7 +330,6 @@ export default function ProductFormScreen({ navigation, route }) {
   const getImageUri = () => {
     if (formData.image) {
       if (formData.image.uri) {
-        // Si es una nueva imagen seleccionada o una existente con URI completa
         if (formData.image.uri.startsWith('http')) {
           return formData.image.uri;
         } else if (formData.image.uri.startsWith('/')) {
@@ -166,7 +348,6 @@ export default function ProductFormScreen({ navigation, route }) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.cancelText}>Cancelar</Text>
@@ -177,7 +358,6 @@ export default function ProductFormScreen({ navigation, route }) {
           <View style={{ width: 80 }} />
         </View>
 
-        {/* Imagen */}
         <TouchableOpacity
           style={styles.imageContainer}
           onPress={handlePickImage}
@@ -199,21 +379,23 @@ export default function ProductFormScreen({ navigation, route }) {
           )}
         </TouchableOpacity>
 
-        {/* Formulario */}
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nombre del producto *</Text>
+            <Text style={styles.label}>Nombre * (máx. 25 caracteres)</Text>
             <TextInput
               style={styles.input}
               placeholder="Ej: Pizza Margarita"
               value={formData.name}
               onChangeText={(value) => handleInputChange("name", value)}
               placeholderTextColor="#999"
+              maxLength={25}
             />
+            <Text style={styles.charCount}>{formData.name.length}/25</Text>
+            <Text style={styles.helperText}>Solo letras, números y acentos</Text>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Precio *</Text>
+            <Text style={styles.label}>Precio * (máx. $100,000)</Text>
             <View style={styles.priceInputContainer}>
               <Text style={styles.currencySymbol}>$</Text>
               <TextInput
@@ -221,25 +403,39 @@ export default function ProductFormScreen({ navigation, route }) {
                 placeholder="0.00"
                 value={formData.price}
                 onChangeText={(value) => handleInputChange("price", value)}
-                keyboardType="numeric"
+                keyboardType="decimal-pad"
                 placeholderTextColor="#999"
               />
             </View>
+            <Text style={styles.helperText}>Solo números (usar punto para decimales)</Text>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Categoría</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ej: Comida Rápida"
-              value={formData.categoryName}
-              onChangeText={(value) => handleInputChange("categoryName", value)}
-              placeholderTextColor="#999"
-            />
+            <Text style={styles.label}>Categoría *</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={formData.categoryName}
+                onValueChange={(value) => handleInputChange("categoryName", value)}
+                style={styles.picker}
+                itemStyle={styles.pickerItem}
+              >
+                {CATEGORIAS.map((cat, index) => (
+                  <Picker.Item 
+                    key={index} 
+                    label={cat} 
+                    value={cat}
+                    color={index === 0 ? "#999" : "#333"}
+                  />
+                ))}
+              </Picker>
+            </View>
+            {formData.categoryName === CATEGORIAS[0] && (
+              <Text style={styles.helperText}>Selecciona la categoría de tu producto</Text>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Descripción</Text>
+            <Text style={styles.label}>Descripción * (máx. 100 palabras)</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Describe tu producto..."
@@ -250,9 +446,12 @@ export default function ProductFormScreen({ navigation, route }) {
               textAlignVertical="top"
               placeholderTextColor="#999"
             />
+            <Text style={styles.charCount}>
+              {formData.description.trim().split(/\s+/).filter(w => w).length}/100 palabras
+            </Text>
+            <Text style={styles.helperText}>Solo letras, números, acentos, comas y puntos</Text>
           </View>
 
-          {/* Información del usuario */}
           {currentUser && (
             <View style={styles.userInfoContainer}>
               <Text style={styles.userInfoLabel}>📱 Contacto</Text>
@@ -355,6 +554,18 @@ const styles = StyleSheet.create({
     color: "#333",
     backgroundColor: "#fff",
   },
+  charCount: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: "right",
+    marginTop: 4,
+  },
+  helperText: {
+    fontSize: 11,
+    color: "#666",
+    marginTop: 4,
+    fontStyle: "italic",
+  },
   priceInputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -374,6 +585,21 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: "#333",
+  },
+  pickerContainer: {
+    borderWidth: 2,
+    borderColor: "#3CB371",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  picker: {
+    height: 50,
+    width: "100%",
+  },
+  pickerItem: {
+    fontSize: 16,
+    height: 50,
   },
   textArea: {
     height: 100,
