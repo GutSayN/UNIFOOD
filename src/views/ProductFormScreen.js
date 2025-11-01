@@ -12,15 +12,19 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
+  Modal,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Picker } from '@react-native-picker/picker';
 import { createProduct, updateProduct, pickImage } from "../services/productService";
 import { getUserData } from "../hooks/useAuth";
 
-// ✅ CATEGORÍAS AMPLIADAS
+const { width, height } = Dimensions.get('window');
+
+// Categorías
 const CATEGORIAS = [
   "Selecciona una categoría",
-  // Alimentos y Bebidas
   "🍕 Comida Rápida",
   "🌮 Comida Mexicana",
   "🍝 Comida Internacional",
@@ -29,49 +33,38 @@ const CATEGORIAS = [
   "🍿 Snacks",
   "🥗 Saludable",
   "🌱 Vegetariano/Vegano",
-  // Electrónica
   "📱 Celulares y Tablets",
   "💻 Computadoras",
   "🎮 Videojuegos",
   "📷 Cámaras y Fotografía",
   "🎧 Audio y Audífonos",
   "⌚ Smartwatches",
-  // Moda y Accesorios
   "👕 Ropa Hombre",
   "👗 Ropa Mujer",
   "👟 Zapatos",
   "👜 Bolsos y Carteras",
-  "⌚ Relojes",
   "💍 Joyería y Accesorios",
-  // Hogar y Decoración
   "🏠 Muebles",
   "🛋️ Decoración",
   "🍳 Cocina y Comedor",
   "🛏️ Dormitorio",
   "🌿 Plantas y Jardín",
-  // Deportes y Fitness
   "⚽ Deportes",
   "🏋️ Fitness y Gym",
   "🚴 Bicicletas",
   "🏃 Running",
-  // Vehículos
   "🚗 Autos",
   "🏍️ Motos",
-  "🚲 Bicicletas",
   "🛴 Patinetas",
-  // Libros y Educación
   "📚 Libros",
   "📝 Material Escolar",
   "🎨 Arte y Manualidades",
-  // Servicios
   "🔧 Servicios Técnicos",
   "🏠 Servicios para el Hogar",
   "👨‍🏫 Clases y Tutorías",
   "💼 Servicios Profesionales",
-  // Mascotas
   "🐕 Mascotas y Accesorios",
   "🐾 Comida para Mascotas",
-  // Otros
   "🎁 Regalos",
   "🎉 Eventos y Fiestas",
   "📦 Otro",
@@ -90,6 +83,8 @@ export default function ProductFormScreen({ navigation, route }) {
   });
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [focusedInput, setFocusedInput] = useState(null);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -135,6 +130,15 @@ export default function ProductFormScreen({ navigation, route }) {
   };
 
   const validateForm = () => {
+    // ========== VALIDAR IMAGEN (NUEVA VALIDACIÓN) ==========
+    if (!formData.image || !formData.image.uri) {
+      Alert.alert(
+        "Imagen requerida",
+        "Debes agregar una foto de tu producto.\n\nToca el área de la imagen para seleccionar una foto de tu galería."
+      );
+      return false;
+    }
+
     // ========== VALIDAR NOMBRE ==========
     if (!formData.name || !formData.name.trim()) {
       Alert.alert(
@@ -342,61 +346,117 @@ export default function ProductFormScreen({ navigation, route }) {
     return null;
   };
 
+  const selectCategory = (category) => {
+    handleInputChange("categoryName", category);
+    setCategoryModalVisible(false);
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Header con gradiente */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.cancelText}>Cancelar</Text>
+          <View style={styles.headerBackground}>
+            <View style={styles.circle1} />
+            <View style={styles.circle2} />
+          </View>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.title}>
+          <Text style={styles.headerTitle}>
             {isEditMode ? "Editar Producto" : "Nuevo Producto"}
           </Text>
-          <View style={{ width: 80 }} />
+          <View style={{ width: 40 }} />
         </View>
 
+        {/* Imagen CON INDICADOR DE REQUERIDO */}
         <TouchableOpacity
-          style={styles.imageContainer}
+          style={[
+            styles.imageContainer,
+            !formData.image && styles.imageContainerRequired
+          ]}
           onPress={handlePickImage}
           activeOpacity={0.8}
         >
           {getImageUri() ? (
-            <Image
-              source={{ uri: getImageUri() }}
-              style={styles.image}
-              resizeMode="cover"
-            />
+            <>
+              <Image
+                source={{ uri: getImageUri() }}
+                style={styles.image}
+                resizeMode="cover"
+              />
+              <View style={styles.imageOverlay}>
+                <View style={styles.changeImageButton}>
+                  <Ionicons name="camera" size={20} color="#fff" />
+                  <Text style={styles.changeImageText}>Cambiar foto</Text>
+                </View>
+              </View>
+            </>
           ) : (
             <View style={styles.imagePlaceholder}>
-              <Text style={styles.imagePlaceholderIcon}>📷</Text>
+              <View style={styles.iconCircle}>
+                <Ionicons name="camera" size={40} color="#059669" />
+              </View>
               <Text style={styles.imagePlaceholderText}>
-                Toca para {isEditMode ? "cambiar" : "agregar"} foto
+                Toca para agregar foto *
               </Text>
+              <Text style={styles.imagePlaceholderSubtext}>
+                La imagen es obligatoria
+              </Text>
+              <View style={styles.requiredBadge}>
+                <Ionicons name="alert-circle" size={16} color="#ef4444" />
+                <Text style={styles.requiredBadgeText}>Requerido</Text>
+              </View>
             </View>
           )}
         </TouchableOpacity>
 
+        {/* Formulario */}
         <View style={styles.form}>
+          {/* Nombre */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nombre * (máx. 25 caracteres)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ej: Pizza Margarita"
-              value={formData.name}
-              onChangeText={(value) => handleInputChange("name", value)}
-              placeholderTextColor="#999"
-              maxLength={25}
-            />
-            <Text style={styles.charCount}>{formData.name.length}/25</Text>
-            <Text style={styles.helperText}>Solo letras, números y acentos</Text>
+            <Text style={styles.label}>
+              <Ionicons name="text-outline" size={16} color="#059669" /> Nombre del producto *
+            </Text>
+            <View style={[
+              styles.inputWrapper,
+              focusedInput === 'name' && styles.inputWrapperFocused
+            ]}>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej: Pizza Margarita"
+                value={formData.name}
+                onChangeText={(value) => handleInputChange("name", value)}
+                placeholderTextColor="#9ca3af"
+                maxLength={25}
+                onFocus={() => setFocusedInput('name')}
+                onBlur={() => setFocusedInput(null)}
+              />
+            </View>
+            <View style={styles.helperRow}>
+              <Text style={styles.helperText}>Solo letras, números y acentos</Text>
+              <Text style={[
+                styles.charCount,
+                formData.name.length > 20 && styles.charCountWarning
+              ]}>{formData.name.length}/25</Text>
+            </View>
           </View>
 
+          {/* Precio */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Precio * (máx. $100,000)</Text>
-            <View style={styles.priceInputContainer}>
+            <Text style={styles.label}>
+              <Ionicons name="cash-outline" size={16} color="#059669" /> Precio * (máx. $100,000)
+            </Text>
+            <View style={[
+              styles.priceInputContainer,
+              focusedInput === 'price' && styles.inputWrapperFocused
+            ]}>
               <Text style={styles.currencySymbol}>$</Text>
               <TextInput
                 style={styles.priceInput}
@@ -404,81 +464,149 @@ export default function ProductFormScreen({ navigation, route }) {
                 value={formData.price}
                 onChangeText={(value) => handleInputChange("price", value)}
                 keyboardType="decimal-pad"
-                placeholderTextColor="#999"
+                placeholderTextColor="#9ca3af"
+                onFocus={() => setFocusedInput('price')}
+                onBlur={() => setFocusedInput(null)}
               />
             </View>
             <Text style={styles.helperText}>Solo números (usar punto para decimales)</Text>
           </View>
 
+          {/* Categoría - SELECTOR MEJORADO */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Categoría *</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={formData.categoryName}
-                onValueChange={(value) => handleInputChange("categoryName", value)}
-                style={styles.picker}
-                itemStyle={styles.pickerItem}
-              >
-                {CATEGORIAS.map((cat, index) => (
-                  <Picker.Item 
-                    key={index} 
-                    label={cat} 
-                    value={cat}
-                    color={index === 0 ? "#999" : "#333"}
-                  />
-                ))}
-              </Picker>
-            </View>
-            {formData.categoryName === CATEGORIAS[0] && (
-              <Text style={styles.helperText}>Selecciona la categoría de tu producto</Text>
-            )}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Descripción * (máx. 100 palabras)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Describe tu producto..."
-              value={formData.description}
-              onChangeText={(value) => handleInputChange("description", value)}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              placeholderTextColor="#999"
-            />
-            <Text style={styles.charCount}>
-              {formData.description.trim().split(/\s+/).filter(w => w).length}/100 palabras
+            <Text style={styles.label}>
+              <Ionicons name="pricetag-outline" size={16} color="#059669" /> Categoría *
             </Text>
-            <Text style={styles.helperText}>Solo letras, números, acentos, comas y puntos</Text>
+            <TouchableOpacity
+              style={styles.categorySelector}
+              onPress={() => setCategoryModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.categorySelectorText,
+                formData.categoryName === CATEGORIAS[0] && styles.categorySelectorPlaceholder
+              ]}>
+                {formData.categoryName}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#059669" />
+            </TouchableOpacity>
           </View>
 
+          {/* Descripción */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>
+              <Ionicons name="document-text-outline" size={16} color="#059669" /> Descripción * (máx. 100 palabras)
+            </Text>
+            <View style={[
+              styles.inputWrapper,
+              focusedInput === 'description' && styles.inputWrapperFocused
+            ]}>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Describe tu producto..."
+                value={formData.description}
+                onChangeText={(value) => handleInputChange("description", value)}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                placeholderTextColor="#9ca3af"
+                onFocus={() => setFocusedInput('description')}
+                onBlur={() => setFocusedInput(null)}
+              />
+            </View>
+            <View style={styles.helperRow}>
+              <Text style={styles.helperText}>Solo letras, números, acentos, comas y puntos</Text>
+              <Text style={[
+                styles.charCount,
+                formData.description.trim().split(/\s+/).filter(w => w).length > 90 && styles.charCountWarning
+              ]}>
+                {formData.description.trim().split(/\s+/).filter(w => w).length}/100
+              </Text>
+            </View>
+          </View>
+
+          {/* Info del usuario */}
           {currentUser && (
             <View style={styles.userInfoContainer}>
-              <Text style={styles.userInfoLabel}>📱 Contacto</Text>
-              <Text style={styles.userInfoText}>
-                {currentUser.phoneNumber || currentUser.phone || "Sin número registrado"}
-              </Text>
-              <Text style={styles.userInfoSubtext}>
-                Los compradores podrán contactarte por WhatsApp
-              </Text>
+              <Ionicons name="call-outline" size={20} color="#059669" />
+              <View style={styles.userInfoText}>
+                <Text style={styles.userInfoLabel}>Contacto</Text>
+                <Text style={styles.userInfoPhone}>
+                  {currentUser.phoneNumber || currentUser.phone || "Sin número registrado"}
+                </Text>
+                <Text style={styles.userInfoSubtext}>
+                  Los compradores podrán contactarte por WhatsApp
+                </Text>
+              </View>
             </View>
           )}
 
+          {/* Botón de envío */}
           <TouchableOpacity
             style={[styles.submitButton, loading && styles.submitButtonDisabled]}
             onPress={handleSubmit}
             disabled={loading}
+            activeOpacity={0.8}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.submitButtonText}>
-                {isEditMode ? "Guardar Cambios" : "Publicar Producto"}
-              </Text>
+              <>
+                <Text style={styles.submitButtonText}>
+                  {isEditMode ? "Guardar Cambios" : "Publicar Producto"}
+                </Text>
+                <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              </>
             )}
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Modal de Categorías */}
+      <Modal
+        visible={categoryModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCategoryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Selecciona una categoría</Text>
+              <TouchableOpacity
+                onPress={() => setCategoryModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close-circle" size={28} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.categoryList} showsVerticalScrollIndicator={false}>
+              {CATEGORIAS.slice(1).map((category, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.categoryItem,
+                    formData.categoryName === category && styles.categoryItemSelected
+                  ]}
+                  onPress={() => selectCategory(category)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.categoryItemText,
+                    formData.categoryName === category && styles.categoryItemTextSelected
+                  ]}>
+                    {category}
+                  </Text>
+                  {formData.categoryName === category && (
+                    <Ionicons name="checkmark-circle" size={24} color="#059669" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -486,55 +614,143 @@ export default function ProductFormScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#f0fdf4",
   },
   scrollContent: {
     paddingBottom: 30,
   },
   header: {
+    position: 'relative',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    overflow: 'hidden',
   },
-  cancelText: {
-    fontSize: 16,
-    color: "#3CB371",
-    width: 80,
+  headerBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#065f46',
   },
-  title: {
-    fontSize: 18,
+  circle1: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: '#059669',
+    opacity: 0.3,
+    top: -50,
+    right: -30,
+  },
+  circle2: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#10b981',
+    opacity: 0.2,
+    bottom: -20,
+    left: -20,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
+    color: "#fff",
+    zIndex: 1,
   },
   imageContainer: {
     width: "100%",
-    height: 300,
-    backgroundColor: "#f5f5f5",
+    height: 250,
+    backgroundColor: "#fff",
+    marginBottom: 20,
+    position: 'relative',
+  },
+  imageContainerRequired: {
+    borderWidth: 3,
+    borderColor: '#fbbf24',
+    borderStyle: 'dashed',
   },
   image: {
     width: "100%",
     height: "100%",
   },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 12,
+    alignItems: 'center',
+  },
+  changeImageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  changeImageText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   imagePlaceholder: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: '#f9fafb',
   },
-  imagePlaceholderIcon: {
-    fontSize: 60,
-    marginBottom: 10,
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#d1fae5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   imagePlaceholderText: {
     fontSize: 16,
-    color: "#999",
+    color: "#065f46",
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  imagePlaceholderSubtext: {
+    fontSize: 13,
+    color: "#6b7280",
+    marginBottom: 12,
+  },
+  requiredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fef2f2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  requiredBadgeText: {
+    color: '#ef4444',
+    fontSize: 13,
+    fontWeight: '600',
   },
   form: {
-    padding: 20,
+    paddingHorizontal: 20,
   },
   inputGroup: {
     marginBottom: 20,
@@ -542,106 +758,198 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
-    marginBottom: 8,
+    color: "#065f46",
+    marginBottom: 10,
+  },
+  inputWrapper: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#e5e7eb",
+  },
+  inputWrapperFocused: {
+    borderColor: "#059669",
+    backgroundColor: "#f0fdf4",
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    padding: 12,
+    padding: 14,
     fontSize: 16,
-    color: "#333",
-    backgroundColor: "#fff",
-  },
-  charCount: {
-    fontSize: 12,
-    color: "#999",
-    textAlign: "right",
-    marginTop: 4,
-  },
-  helperText: {
-    fontSize: 11,
-    color: "#666",
-    marginTop: 4,
-    fontStyle: "italic",
+    color: "#1f2937",
+    fontWeight: '500',
   },
   priceInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
     backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#e5e7eb",
   },
   currencySymbol: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#3CB371",
-    paddingLeft: 12,
+    color: "#059669",
+    paddingLeft: 14,
   },
   priceInput: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     fontSize: 16,
-    color: "#333",
+    color: "#1f2937",
+    fontWeight: '500',
   },
-  pickerContainer: {
-    borderWidth: 2,
-    borderColor: "#3CB371",
-    borderRadius: 8,
+  categorySelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: "#fff",
-    overflow: "hidden",
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#059669",
+    padding: 16,
   },
-  picker: {
-    height: 50,
-    width: "100%",
-  },
-  pickerItem: {
+  categorySelectorText: {
     fontSize: 16,
-    height: 50,
+    color: "#1f2937",
+    fontWeight: '500',
+    flex: 1,
+  },
+  categorySelectorPlaceholder: {
+    color: "#9ca3af",
   },
   textArea: {
     height: 100,
-    paddingTop: 12,
+    paddingTop: 14,
+  },
+  helperRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  helperText: {
+    fontSize: 12,
+    color: "#6b7280",
+    fontStyle: "italic",
+  },
+  charCount: {
+    fontSize: 12,
+    color: "#059669",
+    fontWeight: '600',
+  },
+  charCountWarning: {
+    color: "#f59e0b",
   },
   userInfoContainer: {
-    backgroundColor: "#f0f9f4",
-    padding: 15,
-    borderRadius: 8,
+    flexDirection: 'row',
+    backgroundColor: "#d1fae5",
+    padding: 16,
+    borderRadius: 14,
     marginBottom: 20,
-    borderLeftWidth: 3,
-    borderLeftColor: "#3CB371",
-  },
-  userInfoLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 5,
+    alignItems: 'flex-start',
+    gap: 12,
   },
   userInfoText: {
+    flex: 1,
+  },
+  userInfoLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#065f46",
+    marginBottom: 4,
+  },
+  userInfoPhone: {
     fontSize: 16,
-    color: "#3CB371",
+    color: "#059669",
     fontWeight: "bold",
-    marginBottom: 5,
+    marginBottom: 4,
   },
   userInfoSubtext: {
     fontSize: 12,
-    color: "#666",
+    color: "#6b7280",
   },
   submitButton: {
-    backgroundColor: "#3CB371",
+    backgroundColor: "#059669",
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 14,
     alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
     marginTop: 10,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   submitButtonDisabled: {
-    backgroundColor: "#9cc9b3",
+    backgroundColor: "#9ca3af",
   },
   submitButtonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "bold",
+    letterSpacing: 0.5,
+  },
+  // Estilos del Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+    paddingBottom: 40,
+    maxHeight: height * 0.7,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#065f46',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  categoryList: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  categoryItemSelected: {
+    backgroundColor: '#d1fae5',
+    borderColor: '#059669',
+  },
+  categoryItemText: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '500',
+    flex: 1,
+  },
+  categoryItemTextSelected: {
+    color: '#059669',
+    fontWeight: '700',
   },
 });
