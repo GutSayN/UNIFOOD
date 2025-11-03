@@ -434,7 +434,7 @@ export default function ProductFormScreen({ navigation, route }) {
                 <Ionicons name="camera" size={40} color="#059669" />
               </View>
               <Text style={styles.imagePlaceholderText}>
-                Toca para agregar foto *
+                Toca para agregar foto 
               </Text>
               <Text style={styles.imagePlaceholderSubtext}>
                 La imagen es obligatoria

@@ -369,7 +369,7 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: '#cef5daff',
   },
   centerContainer: {
     flex: 1,
