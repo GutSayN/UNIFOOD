@@ -130,7 +130,7 @@ export default function ProductFormScreen({ navigation, route }) {
   };
 
   const validateForm = () => {
-    // ========== VALIDAR IMAGEN (NUEVA VALIDACIÓN) ==========
+    // ========== VALIDAR IMAGEN ==========
     if (!formData.image || !formData.image.uri) {
       Alert.alert(
         "Imagen requerida",
@@ -248,100 +248,130 @@ export default function ProductFormScreen({ navigation, route }) {
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) {
-      return;
+  if (!validateForm()) {
+    return;
+  }
+
+  if (!currentUser) {
+    Alert.alert(
+      "Error de sesión",
+      "No se pudo obtener la información del usuario.\n\nPor favor cierra sesión e inicia sesión nuevamente."
+    );
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const productData = {
+      name: formData.name.trim(),
+      price: parseFloat(formData.price),
+      description: formData.description.trim(),
+      categoryName: formData.categoryName,
+      image: formData.image,
+    };
+
+    if (!isEditMode) {
+      productData.userId = currentUser.userId || currentUser.id;
     }
 
-    if (!currentUser) {
+    let response;
+    if (isEditMode) {
+      response = await updateProduct(product.productId, productData);
+    } else {
+      response = await createProduct(productData);
+    }
+
+    if (response.isSuccess) {
       Alert.alert(
-        "Error de sesión",
-        "No se pudo obtener la información del usuario.\n\nPor favor cierra sesión e inicia sesión nuevamente."
+        "¡Éxito!",
+        `Tu producto "${productData.name}" ha sido ${isEditMode ? 'actualizado' : 'publicado'} correctamente.`,
+        [
+          {
+            text: "Ver productos",
+            onPress: () => navigation.navigate("Home"),
+          },
+        ]
       );
-      return;
+    } else {
+      let errorMessage = "No se pudo guardar el producto.";
+      
+      if (response.message) {
+        if (response.message.includes("price must not be greater than")) {
+          errorMessage = "El precio máximo permitido es $100,000.\n\nPor favor reduce el precio e intenta de nuevo.";
+        } else {
+          errorMessage = response.message;
+        }
+      }
+      
+      Alert.alert(
+        "No se pudo guardar",
+        errorMessage + "\n\nPor favor verifica los datos e intenta de nuevo."
+      );
     }
-
-    setLoading(true);
-
-    try {
-      const productData = {
-        name: formData.name.trim(),
-        price: parseFloat(formData.price),
-        description: formData.description.trim(),
-        categoryName: formData.categoryName,
-        image: formData.image,
-      };
-
-      if (!isEditMode) {
-        productData.userId = currentUser.userId || currentUser.id;
-      }
-
-      let response;
-      if (isEditMode) {
-        response = await updateProduct(product.productId, productData);
-      } else {
-        response = await createProduct(productData);
-      }
-
-      if (response.isSuccess) {
-        Alert.alert(
-          "¡Éxito!",
-          `Tu producto "${productData.name}" ha sido ${isEditMode ? 'actualizado' : 'publicado'} correctamente.`,
-          [
-            {
-              text: "Ver productos",
-              onPress: () => navigation.navigate("Home"),
-            },
-          ]
-        );
-      } else {
-        let errorMessage = "No se pudo guardar el producto.";
+  } catch (error) {
+    // ✅ ELIMINADO: console.error("Error completo:", error);
+    
+    let errorTitle = "Error al guardar";
+    let errorMessage = "Ocurrió un problema al guardar el producto.";
+    
+    if (error.message) {
+      const errorMsg = error.message.toLowerCase();
+      
+      // ✅ VALIDACIÓN ESPECÍFICA PARA IMAGEN RECHAZADA
+      if (errorMsg.includes("imagen rechazada") || 
+          errorMsg.includes("contenido sensible") || 
+          errorMsg.includes("contenido violento") ||
+          errorMsg.includes("inappropriate")) {
         
-        if (response.message) {
-          if (response.message.includes("price must not be greater than")) {
-            errorMessage = "El precio máximo permitido es $100,000.\n\nPor favor reduce el precio e intenta de nuevo.";
+        errorTitle = "🚫 Imagen no permitida";
+        errorMessage = "La imagen que seleccionaste contiene contenido inapropiado, sensible o violento.\n\n" +
+                      "Por favor selecciona una imagen diferente que cumpla con nuestras políticas de contenido.";
+        
+        // Limpiar la imagen rechazada
+        setFormData((prev) => ({ ...prev, image: null }));
+        
+      } else if (errorMsg.includes("network") || errorMsg.includes("conexión")) {
+        errorMessage = "Error de conexión a internet.\n\nVerifica tu conexión e intenta de nuevo.";
+      } else if (errorMsg.includes("400") || errorMsg.includes("bad request")) {
+        // Para errores 400 genéricos, intentar extraer el mensaje del servidor
+        try {
+          const jsonMatch = error.message.match(/\{.*\}/);
+          if (jsonMatch) {
+            const errorData = JSON.parse(jsonMatch[0]);
+            if (errorData.message && 
+                (errorData.message.includes("IMAGEN RECHAZADA") || 
+                 errorData.message.includes("contenido sensible"))) {
+              errorTitle = "🚫 Imagen no permitida";
+              errorMessage = "La imagen que seleccionaste contiene contenido inapropiado.\n\n" +
+                            "Por favor selecciona una imagen diferente que cumpla con nuestras políticas.";
+              setFormData((prev) => ({ ...prev, image: null }));
+            } else {
+              errorMessage = errorData.message || "Los datos ingresados no son válidos.\n\nRevisa el formulario e intenta de nuevo.";
+            }
           } else {
-            errorMessage = response.message;
+            errorMessage = "Los datos ingresados no son válidos.\n\nRevisa el formulario e intenta de nuevo.";
           }
-        }
-        
-        Alert.alert(
-          "No se pudo guardar",
-          errorMessage + "\n\nPor favor verifica los datos e intenta de nuevo."
-        );
-      }
-    } catch (error) {
-      let errorMessage = "Ocurrió un problema al guardar el producto.";
-      
-      if (error.message) {
-        if (error.message.includes("Network") || error.message.includes("network")) {
-          errorMessage = "Error de conexión a internet.\n\nVerifica tu conexión e intenta de nuevo.";
-        } else if (error.message.includes("400")) {
+        } catch (parseError) {
           errorMessage = "Los datos ingresados no son válidos.\n\nRevisa el formulario e intenta de nuevo.";
-        } else if (error.message.includes("price must not be greater than")) {
-          errorMessage = "El precio máximo permitido es $100,000.\n\nPor favor reduce el precio.";
         }
+      } else if (errorMsg.includes("price must not be greater than")) {
+        errorMessage = "El precio máximo permitido es $100,000.\n\nPor favor reduce el precio.";
+      } else {
+        // Mostrar el mensaje original del servidor si está disponible
+        errorMessage = error.message;
       }
-      
-      Alert.alert(
-        "Error al guardar",
-        errorMessage
-      );
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    Alert.alert(errorTitle, errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const getImageUri = () => {
-    if (formData.image) {
-      if (formData.image.uri) {
-        if (formData.image.uri.startsWith('http')) {
-          return formData.image.uri;
-        } else if (formData.image.uri.startsWith('/')) {
-          return `https://product-microservice-cwk6.onrender.com${formData.image.uri}`;
-        } else {
-          return formData.image.uri;
-        }
-      }
+    if (formData.image && formData.image.uri) {
+      return formData.image.uri;
     }
     return null;
   };
@@ -413,6 +443,9 @@ export default function ProductFormScreen({ navigation, route }) {
                 <Ionicons name="alert-circle" size={16} color="#ef4444" />
                 <Text style={styles.requiredBadgeText}>Requerido</Text>
               </View>
+              <Text style={styles.imageWarning}>
+                ⚠️ No se permiten imágenes con contenido inapropiado
+              </Text>
             </View>
           )}
         </TouchableOpacity>
@@ -743,11 +776,20 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#fecaca',
+    marginBottom: 8,
   },
   requiredBadgeText: {
     color: '#ef4444',
     fontSize: 13,
     fontWeight: '600',
+  },
+  imageWarning: {
+    fontSize: 11,
+    color: '#f59e0b',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginTop: 4,
+    paddingHorizontal: 20,
   },
   form: {
     paddingHorizontal: 20,

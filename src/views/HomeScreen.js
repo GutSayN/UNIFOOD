@@ -13,6 +13,8 @@ import {
   Linking,
   Platform,
   Dimensions,
+  TextInput,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getAllProducts } from "../services/productService";
@@ -22,9 +24,13 @@ const { width, height } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }) {
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const searchAnimation = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
     loadUserAndProducts();
@@ -36,6 +42,23 @@ export default function HomeScreen({ navigation }) {
     });
     return unsubscribe;
   }, [navigation]);
+
+  // Filtrar productos en tiempo real
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredProducts(products);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = products.filter(product => {
+        const nameMatch = product.name?.toLowerCase().includes(query);
+        const categoryMatch = product.categoryName?.toLowerCase().includes(query);
+        const descriptionMatch = product.description?.toLowerCase().includes(query);
+        const priceMatch = product.price?.toString().includes(query);
+        return nameMatch || categoryMatch || descriptionMatch || priceMatch;
+      });
+      setFilteredProducts(filtered);
+    }
+  }, [searchQuery, products]);
 
   const loadUserAndProducts = async () => {
     try {
@@ -63,11 +86,14 @@ export default function HomeScreen({ navigation }) {
       
       if (response.isSuccess && response.result) {
         setProducts(response.result);
+        setFilteredProducts(response.result);
       } else {
         setProducts([]);
+        setFilteredProducts([]);
       }
     } catch (error) {
       setProducts([]);
+      setFilteredProducts([]);
     }
   };
 
@@ -75,6 +101,22 @@ export default function HomeScreen({ navigation }) {
     setRefreshing(true);
     await loadProducts();
     setRefreshing(false);
+  };
+
+  const toggleSearch = () => {
+    const toValue = showSearch ? 0 : 1;
+    setShowSearch(!showSearch);
+    
+    Animated.spring(searchAnimation, {
+      toValue,
+      useNativeDriver: false,
+      tension: 50,
+      friction: 7,
+    }).start();
+
+    if (showSearch) {
+      setSearchQuery("");
+    }
   };
 
   const handleLogout = async () => {
@@ -151,9 +193,7 @@ export default function HomeScreen({ navigation }) {
 
         {item.imageUrl ? (
           <Image
-            source={{ 
-              uri: `https://product-microservice-cwk6.onrender.com${item.imageUrl}` 
-            }}
+            source={{ uri: item.imageUrl }}
             style={styles.productImage}
             resizeMode="cover"
           />
@@ -206,6 +246,11 @@ export default function HomeScreen({ navigation }) {
     );
   }
 
+  const searchHeight = searchAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 60],
+  });
+
   return (
     <View style={styles.container}>
       {/* Header mejorado */}
@@ -217,6 +262,16 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.headerTitle}>UFood</Text>
         </View>
         <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={toggleSearch}
+          >
+            <Ionicons 
+              name={showSearch ? "close" : "search"} 
+              size={22} 
+              color="#fff" 
+            />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerButton}
             onPress={() => navigation.navigate("ProductsList")}
@@ -232,19 +287,67 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
 
-      {products.length === 0 ? (
+      {/* Barra de búsqueda animada */}
+      <Animated.View style={[styles.searchContainer, { height: searchHeight }]}>
+        {showSearch && (
+          <View style={styles.searchInputWrapper}>
+            <Ionicons name="search" size={20} color="#6b7280" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar productos, categorías..."
+              placeholderTextColor="#9ca3af"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <Ionicons name="close-circle" size={20} color="#6b7280" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </Animated.View>
+
+      {/* Contador de resultados */}
+      {searchQuery.trim() !== "" && (
+        <View style={styles.resultsCounter}>
+          <Text style={styles.resultsText}>
+            {filteredProducts.length} {filteredProducts.length === 1 ? 'resultado' : 'resultados'}
+          </Text>
+        </View>
+      )}
+
+      {filteredProducts.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyCircle}>
-            <Ionicons name="fast-food-outline" size={60} color="#059669" />
+            <Ionicons 
+              name={searchQuery ? "search-outline" : "fast-food-outline"} 
+              size={60} 
+              color="#059669" 
+            />
           </View>
-          <Text style={styles.emptyText}>No hay productos disponibles</Text>
-          <Text style={styles.emptySubtext}>
-            Aún no hay productos publicados
+          <Text style={styles.emptyText}>
+            {searchQuery ? "No se encontraron resultados" : "No hay productos disponibles"}
           </Text>
+          <Text style={styles.emptySubtext}>
+            {searchQuery 
+              ? `No hay productos que coincidan con "${searchQuery}"`
+              : "Aún no hay productos publicados"
+            }
+          </Text>
+          {searchQuery && (
+            <TouchableOpacity
+              style={styles.clearSearchButton}
+              onPress={() => setSearchQuery("")}
+            >
+              <Text style={styles.clearSearchButtonText}>Limpiar búsqueda</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <FlatList
-          data={products}
+          data={filteredProducts}
           keyExtractor={(item) => item.productId}
           renderItem={renderProduct}
           contentContainerStyle={styles.listContent}
@@ -266,7 +369,7 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ddddddff',
+    backgroundColor: '#f0fdf4',
   },
   centerContainer: {
     flex: 1,
@@ -326,6 +429,39 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: "center",
     alignItems: "center",
+  },
+  searchContainer: {
+    backgroundColor: '#065f46',
+    paddingHorizontal: 20,
+    overflow: 'hidden',
+  },
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
+    marginBottom: 12,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '500',
+  },
+  resultsCounter: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#d1fae5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#a7f3d0',
+  },
+  resultsText: {
+    fontSize: 14,
+    color: '#059669',
+    fontWeight: '600',
   },
   listContent: {
     paddingBottom: 20,
@@ -487,5 +623,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6b7280",
     textAlign: "center",
+    marginBottom: 20,
+  },
+  clearSearchButton: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 10,
+  },
+  clearSearchButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

@@ -1,10 +1,29 @@
 // src/services/productService.js
-const PRODUCT_API_URL = "https://product-microservice-cwk6.onrender.com/api/product";
+const PRODUCT_API_URL = "https://products-microservice-a9b6.onrender.com/api/product";
+const BASE_URL = "https://products-microservice-a9b6.onrender.com"; // ✅ URL base correcta
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Cache para usuarios
 const userCache = {};
+
+// ✅ NUEVA FUNCIÓN: Construir URL completa de imagen
+export const getFullImageUrl = (imageUrl) => {
+  if (!imageUrl) return null;
+  
+  // Si ya es una URL completa, retornarla
+  if (imageUrl.startsWith('http')) {
+    return imageUrl;
+  }
+  
+  // Si es una ruta relativa, construir URL completa
+  if (imageUrl.startsWith('/')) {
+    return `${BASE_URL}${imageUrl}`;
+  }
+  
+  // Si no tiene barra inicial, agregarla
+  return `${BASE_URL}/${imageUrl}`;
+};
 
 // Función para obtener datos de un usuario por ID
 const getUserById = async (userId) => {
@@ -16,10 +35,10 @@ const getUserById = async (userId) => {
     const userData = await AsyncStorage.getItem("userData");
     if (userData) {
       const user = JSON.parse(userData);
-      if (user.id === userId) {
+      if (user.id === userId || user.userId === userId) {
         const userInfo = {
           name: user.name || "Usuario Anónimo",
-          phoneNumber: user.phoneNumber || null,
+          phoneNumber: user.phoneNumber || user.phone || null,
         };
         userCache[userId] = userInfo;
         return userInfo;
@@ -38,13 +57,14 @@ const getUserById = async (userId) => {
   }
 };
 
-// Enriquecer un producto con datos del usuario
+// Enriquecer un producto con datos del usuario Y URL completa de imagen
 const enrichProduct = async (product) => {
   const userData = await getUserById(product.userId);
   return {
     ...product,
     userName: userData.name,
     userPhone: userData.phoneNumber,
+    imageUrl: getFullImageUrl(product.imageUrl), // ✅ Construir URL completa
   };
 };
 

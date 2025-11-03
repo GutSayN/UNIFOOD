@@ -121,7 +121,7 @@ export default function ProductsListScreen({ navigation }) {
         {/* Imagen */}
         {item.imageUrl ? (
           <Image
-            source={{ uri: `https://product-microservice-cwk6.onrender.com${item.imageUrl}` }}
+          source={{ uri: item.imageUrl }}
             style={styles.productImage}
             resizeMode="cover"
           />
