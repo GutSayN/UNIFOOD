@@ -1,74 +1,24 @@
 // src/services/productService.js
 const PRODUCT_API_URL = "https://products-microservice-a9b6.onrender.com/api/product";
-const BASE_URL = "https://products-microservice-a9b6.onrender.com"; // ✅ URL base correcta
+const BASE_URL = "https://products-microservice-a9b6.onrender.com";
 import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Cache para usuarios
-const userCache = {};
-
-// ✅ NUEVA FUNCIÓN: Construir URL completa de imagen
+// ✅ Construir URL completa de imagen
 export const getFullImageUrl = (imageUrl) => {
   if (!imageUrl) return null;
   
-  // Si ya es una URL completa, retornarla
   if (imageUrl.startsWith('http')) {
     return imageUrl;
   }
   
-  // Si es una ruta relativa, construir URL completa
   if (imageUrl.startsWith('/')) {
     return `${BASE_URL}${imageUrl}`;
   }
   
-  // Si no tiene barra inicial, agregarla
   return `${BASE_URL}/${imageUrl}`;
 };
 
-// Función para obtener datos de un usuario por ID
-const getUserById = async (userId) => {
-  if (userCache[userId]) {
-    return userCache[userId];
-  }
-
-  try {
-    const userData = await AsyncStorage.getItem("userData");
-    if (userData) {
-      const user = JSON.parse(userData);
-      if (user.id === userId || user.userId === userId) {
-        const userInfo = {
-          name: user.name || "Usuario Anónimo",
-          phoneNumber: user.phoneNumber || user.phone || null,
-        };
-        userCache[userId] = userInfo;
-        return userInfo;
-      }
-    }
-
-    return {
-      name: "Usuario Anónimo",
-      phoneNumber: null,
-    };
-  } catch (error) {
-    return {
-      name: "Usuario Anónimo",
-      phoneNumber: null,
-    };
-  }
-};
-
-// Enriquecer un producto con datos del usuario Y URL completa de imagen
-const enrichProduct = async (product) => {
-  const userData = await getUserById(product.userId);
-  return {
-    ...product,
-    userName: userData.name,
-    userPhone: userData.phoneNumber,
-    imageUrl: getFullImageUrl(product.imageUrl), // ✅ Construir URL completa
-  };
-};
-
-// Obtener todos los productos CON datos de usuario
+// ✅ Obtener todos los productos (ya vienen con userName y userPhone del backend)
 export const getAllProducts = async () => {
   try {
     const response = await fetch(`${PRODUCT_API_URL}/GetAll`, {
@@ -80,13 +30,15 @@ export const getAllProducts = async () => {
     const result = await response.json();
     
     if (result.isSuccess && result.result) {
-      const enrichedProducts = await Promise.all(
-        result.result.map(product => enrichProduct(product))
-      );
+      // Agregar URL completa de imagen a cada producto
+      const productsWithFullImageUrl = result.result.map(product => ({
+        ...product,
+        imageUrl: getFullImageUrl(product.imageUrl),
+      }));
       
       return {
         ...result,
-        result: enrichedProducts,
+        result: productsWithFullImageUrl,
       };
     }
     
@@ -96,7 +48,7 @@ export const getAllProducts = async () => {
   }
 };
 
-// Obtener producto por ID
+// ✅ Obtener producto por ID
 export const getProductById = async (id) => {
   try {
     const response = await fetch(`${PRODUCT_API_URL}/${id}`, {
@@ -108,10 +60,12 @@ export const getProductById = async (id) => {
     const result = await response.json();
     
     if (result.isSuccess && result.result) {
-      const enrichedProduct = await enrichProduct(result.result);
       return {
         ...result,
-        result: enrichedProduct,
+        result: {
+          ...result.result,
+          imageUrl: getFullImageUrl(result.result.imageUrl),
+        },
       };
     }
     
@@ -121,7 +75,7 @@ export const getProductById = async (id) => {
   }
 };
 
-// Obtener productos por ID de usuario
+// ✅ Obtener productos por ID de usuario
 export const getProductsByUserId = async (userId) => {
   try {
     const response = await fetch(`${PRODUCT_API_URL}/user/${userId}`, {
@@ -133,13 +87,14 @@ export const getProductsByUserId = async (userId) => {
     const result = await response.json();
     
     if (result.isSuccess && result.result) {
-      const enrichedProducts = await Promise.all(
-        result.result.map(product => enrichProduct(product))
-      );
+      const productsWithFullImageUrl = result.result.map(product => ({
+        ...product,
+        imageUrl: getFullImageUrl(product.imageUrl),
+      }));
       
       return {
         ...result,
-        result: enrichedProducts,
+        result: productsWithFullImageUrl,
       };
     }
     

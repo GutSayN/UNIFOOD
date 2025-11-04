@@ -137,31 +137,45 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
-  const handleWhatsApp = (product) => {
-    if (!product.userPhone) {
-      Alert.alert(
-        "Sin contacto",
-        "Este vendedor no tiene número de teléfono registrado."
-      );
-      return;
-    }
+ const handleWhatsApp = (product) => {
+  // ✅ Validar que existe el número de teléfono
+  if (!product.userPhone) {
+    Alert.alert(
+      "Sin contacto",
+      "Este vendedor no tiene número de teléfono registrado."
+    );
+    return;
+  }
 
-    let phoneNumber = product.userPhone.replace(/[^\d]/g, '');
-    
-    if (!phoneNumber.startsWith('521') && phoneNumber.length === 10) {
-      phoneNumber = '52' + phoneNumber;
-    }
-    
-    const message = `Hola! Estoy interesado en tu producto: ${product.name} - $${product.price}`;
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+  // ✅ Limpiar el número (quitar espacios, guiones, etc.)
+  let phoneNumber = product.userPhone.replace(/[^\d]/g, '');
+  
+  // ✅ Validar que el número tenga 10 dígitos
+  if (phoneNumber.length !== 10) {
+    Alert.alert(
+      "Número inválido",
+      "El número de teléfono del vendedor no es válido."
+    );
+    return;
+  }
+  
+  // ✅ Agregar código de país de México (52)
+  phoneNumber = '52' + phoneNumber;
+  
+  // ✅ Construir mensaje personalizado
+  const message = `Hola! Estoy interesado en tu producto: *${product.name}*\nPrecio: $${product.price.toLocaleString()}`;
+  
+  // ✅ Construir URL de WhatsApp
+  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
 
-    Linking.openURL(whatsappUrl).catch((err) => {
-      Alert.alert(
-        "Error",
-        "No se pudo abrir WhatsApp. Verifica que esté instalado."
-      );
-    });
-  };
+  // ✅ Abrir WhatsApp
+  Linking.openURL(whatsappUrl).catch((err) => {
+    Alert.alert(
+      "Error",
+      "No se pudo abrir WhatsApp. Verifica que esté instalado."
+    );
+  });
+};
 
   const isMyProduct = (product) => {
     if (!currentUser || !product) return false;
