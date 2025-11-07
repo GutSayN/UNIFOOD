@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
   Dimensions,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { registerUser } from "../services/api";
@@ -25,6 +26,7 @@ export default function RegisterScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [focusedInput, setFocusedInput] = useState(null);
   const [errors, setErrors] = useState({});
+  const [acceptedTerms, setAcceptedTerms] = useState(false); // 🆕 Estado para términos
 
   const validateFields = () => {
     const newErrors = {};
@@ -32,12 +34,12 @@ export default function RegisterScreen({ navigation }) {
 
     // 🔹 Validar nombre completo (solo letras y MÍNIMO 30 caracteres)
     if (!name.trim()) {
-  newErrors.name = "El nombre completo es obligatorio.";
-  isValid = false;
-} else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(name)) {
-  newErrors.name = "El nombre solo puede contener letras.";
-  isValid = false;
-}
+      newErrors.name = "El nombre completo es obligatorio.";
+      isValid = false;
+    } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(name)) {
+      newErrors.name = "El nombre solo puede contener letras.";
+      isValid = false;
+    }
 
     // 🔹 Validar correo electrónico
     if (!email.trim()) {
@@ -69,6 +71,12 @@ export default function RegisterScreen({ navigation }) {
       isValid = false;
     }
 
+    // 🆕 Validar términos y condiciones
+    if (!acceptedTerms) {
+      newErrors.terms = "Debes aceptar los términos y condiciones.";
+      isValid = false;
+    }
+
     setErrors(newErrors);
     return isValid;
   };
@@ -94,6 +102,21 @@ export default function RegisterScreen({ navigation }) {
       }
     } catch (error) {
       Alert.alert("Error", "Hubo un problema con el registro.");
+    }
+  };
+
+  // 🆕 Función para abrir términos y condiciones
+  const openTerms = async () => {
+    const url = "https://gutsayn.github.io/ufood-legal/legal/terms.html";
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert("Error", "No se puede abrir el enlace");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Ocurrió un problema al abrir los términos");
     }
   };
 
@@ -173,15 +196,15 @@ export default function RegisterScreen({ navigation }) {
                   color={focusedInput === 'name' ? '#059669' : '#6b7280'} 
                 />
               </View>
-             <TextInput
-              style={styles.input}
-              placeholder="Nombre Completo"
-              placeholderTextColor="#9ca3af"
-              value={name}
-              onChangeText={setName}
-              maxLength={40}
-              onFocus={() => setFocusedInput('name')}
-              onBlur={() => setFocusedInput(null)}
+              <TextInput
+                style={styles.input}
+                placeholder="Nombre Completo"
+                placeholderTextColor="#9ca3af"
+                value={name}
+                onChangeText={setName}
+                maxLength={40}
+                onFocus={() => setFocusedInput('name')}
+                onBlur={() => setFocusedInput(null)}
               />
               {getFieldStatus('name') !== null && (
                 <View style={styles.statusIcon}>
@@ -352,11 +375,44 @@ export default function RegisterScreen({ navigation }) {
             </View>
           </View>
 
+          {/* 🆕 Checkbox de Términos y Condiciones */}
+          <View style={styles.termsContainer}>
+            <TouchableOpacity 
+              style={[
+                styles.checkbox,
+                acceptedTerms && styles.checkboxChecked,
+                errors.terms && styles.checkboxError
+              ]}
+              onPress={() => setAcceptedTerms(!acceptedTerms)}
+              activeOpacity={0.7}
+            >
+              {acceptedTerms && (
+                <Ionicons name="checkmark" size={18} color="white" />
+              )}
+            </TouchableOpacity>
+            <View style={styles.termsTextContainer}>
+              <Text style={styles.termsText}>
+                Acepto los{' '}
+                <Text 
+                  style={styles.termsLink}
+                  onPress={openTerms}
+                >
+                  Términos y Condiciones
+                </Text>
+              </Text>
+            </View>
+          </View>
+          {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
+
           {/* Botón de registro */}
           <TouchableOpacity 
-            style={styles.registerButton} 
+            style={[
+              styles.registerButton,
+              !acceptedTerms && styles.registerButtonDisabled
+            ]} 
             onPress={handleRegister}
             activeOpacity={0.8}
+            disabled={!acceptedTerms}
           >
             <Text style={styles.registerButtonText}>Crear Cuenta</Text>
             <Ionicons name="arrow-forward" size={20} color="white" />
@@ -600,6 +656,46 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontWeight: '600',
   },
+  // 🆕 Estilos para Términos y Condiciones
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    backgroundColor: '#f9fafb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  checkboxError: {
+    borderColor: '#ef4444',
+  },
+  termsTextContainer: {
+    flex: 1,
+  },
+  termsText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: '#059669',
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
+  },
   registerButton: {
     backgroundColor: '#059669',
     borderRadius: 16,
@@ -613,6 +709,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
+  },
+  registerButtonDisabled: {
+    backgroundColor: '#9ca3af',
+    shadowOpacity: 0.1,
   },
   registerButtonText: {
     color: 'white',

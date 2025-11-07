@@ -8,8 +8,7 @@
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "resizeMode": "contain"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -27,15 +26,15 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/adaptive-icon.png"
       },
       "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "CAMERA"
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.yourcompany.unifood"
+      "package": "com.uttt.unifood"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -48,6 +47,11 @@
           "cameraPermission": "La aplicación necesita acceso a tu cámara para tomar fotos de productos."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f4056c44-deaa-4b76-afc6-d6992198bf0b"
+      }
+    }
   }
 }
