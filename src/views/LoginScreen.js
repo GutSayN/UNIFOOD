@@ -1,4 +1,9 @@
-import React, { useState } from "react";
+/**
+ * Pantalla de Login
+ * Con MVVM - usa useAuthViewModel
+ */
+
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,65 +15,285 @@ import {
   Platform,
   ScrollView,
   Dimensions,
-  Image,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { loginUser } from "../services/api";
-import { saveUserSession } from "../hooks/useAuth";
+  ActivityIndicator,
+  Modal,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+// Usar el nuevo ViewModel
+import { useAuthViewModel } from '../viewmodels/Auth.viewmodel';
 
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
-  const [userName, setUserName] = useState("");
-  const [password, setPassword] = useState("");
+  // Estados locales del formulario
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [focusedInput, setFocusedInput] = useState(null);
 
+  // Estado para modal de error personalizado
+  const [errorModal, setErrorModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'alert-circle',
+    iconColor: '#ef4444',
+  });
+
+  // Estado para modal de bienvenida
+  const [welcomeModal, setWelcomeModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'checkmark-circle',
+    iconColor: '#10b981',
+    onClose: () => {},
+  });
+
+  // Ref para el timer de auto-navegación
+  const navigationTimerRef = useRef(null);
+
+  // Usar el ViewModel en lugar de lógica dispersa
+  const { login, isLoading, error, clearError } = useAuthViewModel();
+
+  // Limpiar timer al desmontar el componente
+  useEffect(() => {
+    return () => {
+      if (navigationTimerRef.current) {
+        clearTimeout(navigationTimerRef.current);
+      }
+    };
+  }, []);
+
+  /**
+   * Mostrar modal de error personalizado
+   */
+  const showError = (title, message, icon = 'alert-circle', iconColor = '#ef4444') => {
+    setErrorModal({
+      visible: true,
+      title,
+      message,
+      icon,
+      iconColor,
+    });
+  };
+
+  /**
+   * Cerrar modal de error
+   */
+  const closeErrorModal = () => {
+    setErrorModal({ ...errorModal, visible: false });
+  };
+
+  /**
+   * Mostrar modal de bienvenida con navegación automática
+   */
+  const showWelcome = (title, message, onClose) => {
+    setWelcomeModal({
+      visible: true,
+      title,
+      message,
+      icon: 'checkmark-circle',
+      iconColor: '#10b981',
+      onClose,
+    });
+
+    // Navegar automáticamente después de 1.5 segundos
+    navigationTimerRef.current = setTimeout(() => {
+      setWelcomeModal(prev => ({ ...prev, visible: false }));
+      onClose();
+    }, 1500);
+  };
+
+  /**
+   * Cerrar modal de bienvenida manualmente (por si el usuario quiere cerrar antes)
+   */
+  const closeWelcomeModal = () => {
+    if (navigationTimerRef.current) {
+      clearTimeout(navigationTimerRef.current);
+    }
+    setWelcomeModal({ ...welcomeModal, visible: false });
+    welcomeModal.onClose();
+  };
+
+  /**
+   * VALIDAR EMAIL
+   */
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  /**
+   * Manejar submit del formulario CON VALIDACIONES
+   */
   const handleLogin = async () => {
-    if (!userName || !password) {
-      Alert.alert("Error", "Por favor ingresa tu correo y contraseña.");
+    // Limpiar errores previos
+    clearError();
+
+    // ========== VALIDAR CAMPOS VACÍOS ==========
+    if (!email || !email.trim()) {
+      showError(
+        'Campo vacío',
+        'Por favor ingresa tu correo electrónico.',
+        'mail-outline',
+        '#f59e0b'
+      );
       return;
     }
 
-    try {
-      const response = await loginUser({ userName, password });
+    if (!password || !password.trim()) {
+      showError(
+        'Campo vacío',
+        'Por favor ingresa tu contraseña.',
+        'lock-closed-outline',
+        '#f59e0b'
+      );
+      return;
+    }
 
-      if (response.isSuccess) {
-        const { user, token } = response.result;
+    // ========== VALIDAR FORMATO DE EMAIL ==========
+    if (!validateEmail(email.trim())) {
+      showError(
+        'Correo inválido',
+        'Por favor ingresa un correo electrónico válido.\n\nEjemplo: usuario@ejemplo.com',
+        'mail-outline',
+        '#f59e0b'
+      );
+      return;
+    }
 
-        if (user.status === 2) {
-          Alert.alert("Cuenta no disponible", "Esta cuenta no existe o está inactiva.");
-          return;
-        }
+    // ========== VALIDAR LONGITUD DE CONTRASEÑA ==========
+    if (password.length < 6) {
+      showError(
+        'Contraseña muy corta',
+        'La contraseña debe tener al menos 6 caracteres.',
+        'lock-closed-outline',
+        '#f59e0b'
+      );
+      return;
+    }
 
-        if (user.status === 1) {
-          await saveUserSession(token, user);
+    // Llamar al ViewModel
+    const result = await login(email.trim(), password);
 
-          if (user.roles.includes("ADMIN")) {
-            Alert.alert("Bienvenido", `Hola, ${user.name}!`);
-            navigation.replace("AdminHome");
-          } else if (user.roles.includes("USER")) {
-            Alert.alert("Bienvenido", `Hola, ${user.name}!`);
-            navigation.replace("Home");
+    if (result.success) {
+      // Mostrar modal de bienvenida con navegación automática
+      const userName = result.user?.name || result.user?.userName || 'Usuario';
+      
+      showWelcome(
+        '¡Bienvenido! 👋',
+        `Hola, ${userName}!\n\nIniciando sesión...`,
+        () => {
+          // Navegar según el rol del usuario
+          if (result.isAdmin) {
+            navigation.replace('AdminHome');
           } else {
-            Alert.alert("Error", "Rol de usuario no reconocido.");
+            navigation.replace('Home');
           }
         }
-      } else {
-        Alert.alert("Error", response.message || "Credenciales incorrectas");
+      );
+    } else {
+      // Manejar diferentes tipos de errores
+      const errorMsg = (result.error || '').toLowerCase();
+      
+      // Error de credenciales incorrectas
+      if (errorMsg.includes('credenciales') || 
+          errorMsg.includes('incorrecta') || 
+          errorMsg.includes('incorrectos') ||
+          errorMsg.includes('incorrect') ||
+          errorMsg.includes('contraseña') ||
+          errorMsg.includes('password') ||
+          errorMsg.includes('invalid')) {
+        showError(
+          '🔒 Credenciales incorrectas',
+          'El correo o la contraseña que ingresaste son incorrectos.\n\nPor favor verifica tus datos e intenta de nuevo.',
+          'lock-closed-outline',
+          '#ef4444'
+        );
+      } 
+      // Error de cuenta bloqueada por intentos
+      else if (errorMsg.includes('demasiados intentos') || 
+               errorMsg.includes('bloqueada') ||
+               errorMsg.includes('intenta de nuevo en')) {
+        showError(
+          '⏱️ Cuenta temporalmente bloqueada',
+          result.error,
+          'time-outline',
+          '#f59e0b'
+        );
       }
-    } catch (error) {
-      Alert.alert("Error", "Ocurrió un problema al iniciar sesión");
-      console.error(error);
+      // Error de cuenta no disponible
+      else if (errorMsg.includes('cuenta no disponible') || 
+               errorMsg.includes('inactiva') ||
+               errorMsg.includes('no existe')) {
+        showError(
+          '⚠️ Cuenta no disponible',
+          'Esta cuenta no existe o está inactiva.\n\nPor favor verifica tus datos o contacta al administrador.',
+          'person-remove-outline',
+          '#ef4444'
+        );
+      } 
+      // Error de conexión
+      else if (errorMsg.includes('network') || 
+               errorMsg.includes('conexión') ||
+               errorMsg.includes('connection') ||
+               errorMsg.includes('sin conexión')) {
+        showError(
+          '📡 Sin conexión',
+          'No se pudo conectar al servidor.\n\nVerifica tu conexión a internet e intenta de nuevo.',
+          'cloud-offline-outline',
+          '#f59e0b'
+        );
+      }
+      // Error de timeout
+      else if (errorMsg.includes('timeout') || 
+               errorMsg.includes('tiempo de espera')) {
+        showError(
+          '⏱️ Tiempo agotado',
+          'La conexión tardó demasiado.\n\nPor favor intenta de nuevo.',
+          'time-outline',
+          '#f59e0b'
+        );
+      }
+      // Error del servidor
+      else if (errorMsg.includes('servidor') || 
+               errorMsg.includes('server error')) {
+        showError(
+          '🔧 Error del servidor',
+          'Hay un problema en el servidor.\n\nPor favor intenta más tarde.',
+          'construct-outline',
+          '#ef4444'
+        );
+      }
+      // Error de rol
+      else if (errorMsg.includes('rol') || errorMsg.includes('role')) {
+        showError(
+          '🛡️ Error de autorización',
+          'No se pudo determinar tu rol de usuario.\n\nPor favor contacta al administrador.',
+          'shield-outline',
+          '#ef4444'
+        );
+      } 
+      // Error genérico
+      else {
+        showError(
+          '❌ Error al iniciar sesión',
+          result.error || 'No se pudo iniciar sesión.\n\nPor favor intenta de nuevo más tarde.',
+          'alert-circle',
+          '#ef4444'
+        );
+      }
     }
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -100,42 +325,47 @@ export default function LoginScreen({ navigation }) {
 
           {/* Input de correo */}
           <View style={styles.inputContainer}>
-            <View style={[
-              styles.inputWrapper,
-              focusedInput === 'email' && styles.inputWrapperFocused
-            ]}>
+            <View
+              style={[
+                styles.inputWrapper,
+                focusedInput === 'email' && styles.inputWrapperFocused,
+              ]}
+            >
               <View style={styles.iconContainer}>
-                <Ionicons 
-                  name="mail-outline" 
-                  size={22} 
-                  color={focusedInput === 'email' ? '#059669' : '#6b7280'} 
+                <Ionicons
+                  name="mail-outline"
+                  size={22}
+                  color={focusedInput === 'email' ? '#059669' : '#6b7280'}
                 />
               </View>
               <TextInput
                 style={styles.input}
                 placeholder="Correo electrónico"
                 placeholderTextColor="#9ca3af"
-                value={userName}
-                onChangeText={setUserName}
+                value={email}
+                onChangeText={setEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 onFocus={() => setFocusedInput('email')}
                 onBlur={() => setFocusedInput(null)}
+                editable={!isLoading}
               />
             </View>
           </View>
 
           {/* Input de contraseña */}
           <View style={styles.inputContainer}>
-            <View style={[
-              styles.inputWrapper,
-              focusedInput === 'password' && styles.inputWrapperFocused
-            ]}>
+            <View
+              style={[
+                styles.inputWrapper,
+                focusedInput === 'password' && styles.inputWrapperFocused,
+              ]}
+            >
               <View style={styles.iconContainer}>
-                <Ionicons 
-                  name="lock-closed-outline" 
-                  size={22} 
-                  color={focusedInput === 'password' ? '#059669' : '#6b7280'} 
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={22}
+                  color={focusedInput === 'password' ? '#059669' : '#6b7280'}
                 />
               </View>
               <TextInput
@@ -147,35 +377,49 @@ export default function LoginScreen({ navigation }) {
                 onChangeText={setPassword}
                 onFocus={() => setFocusedInput('password')}
                 onBlur={() => setFocusedInput(null)}
+                editable={!isLoading}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeButton}
+                disabled={isLoading}
               >
-                <Ionicons 
-                  name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                  size={22} 
-                  color="#6b7280" 
+                <Ionicons
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={22}
+                  color="#6b7280"
                 />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Botón de login */}
-          <TouchableOpacity 
-            style={styles.loginButton} 
+          <TouchableOpacity
+            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
             onPress={handleLogin}
             activeOpacity={0.8}
+            disabled={isLoading}
           >
-            <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
-            <Ionicons name="arrow-forward" size={20} color="white" />
+            {isLoading ? (
+              <>
+                <ActivityIndicator color="#fff" size="small" />
+                <Text style={styles.loginButtonText}> Iniciando...</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+                <Ionicons name="arrow-forward" size={20} color="white" />
+              </>
+            )}
           </TouchableOpacity>
-
 
           {/* Registro */}
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>¿No tienes cuenta? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Register')}
+              disabled={isLoading}
+            >
               <Text style={styles.registerLink}>Regístrate aquí</Text>
             </TouchableOpacity>
           </View>
@@ -188,6 +432,54 @@ export default function LoginScreen({ navigation }) {
           <Ionicons name="leaf" size={20} color="#d1fae5" />
         </View>
       </ScrollView>
+
+      {/* MODAL DE ERROR PERSONALIZADO */}
+      <Modal
+        visible={errorModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeErrorModal}
+      >
+        <View style={styles.errorModalOverlay}>
+          <View style={styles.errorModalContent}>
+            <View style={[styles.errorModalIcon, { backgroundColor: `${errorModal.iconColor}15` }]}>
+              <Ionicons name={errorModal.icon} size={48} color={errorModal.iconColor} />
+            </View>
+            
+            <Text style={styles.errorModalTitle}>{errorModal.title}</Text>
+            <Text style={styles.errorModalMessage}>{errorModal.message}</Text>
+            
+            <TouchableOpacity
+              style={[styles.errorModalButton, { backgroundColor: errorModal.iconColor }]}
+              onPress={closeErrorModal}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.errorModalButtonText}>Entendido</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL DE BIENVENIDA PERSONALIZADO - NAVEGACIÓN AUTOMÁTICA */}
+      <Modal
+        visible={welcomeModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeWelcomeModal}
+      >
+        <View style={styles.welcomeModalOverlay}>
+          <View style={styles.welcomeModalContent}>
+            <View style={[styles.welcomeModalIcon, { backgroundColor: `${welcomeModal.iconColor}15` }]}>
+              <Ionicons name={welcomeModal.icon} size={64} color={welcomeModal.iconColor} />
+            </View>
+            
+            <Text style={styles.welcomeModalTitle}>{welcomeModal.title}</Text>
+            <Text style={styles.welcomeModalMessage}>{welcomeModal.message}</Text>
+            
+            <ActivityIndicator size="large" color={welcomeModal.iconColor} style={styles.welcomeLoader} />
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -350,44 +642,15 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  loginButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
   loginButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
     marginRight: 10,
     letterSpacing: 0.5,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e5e7eb',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: '#9ca3af',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  socialContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 24,
-  },
-  socialButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#f9fafb',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
   },
   registerContainer: {
     flexDirection: 'row',
@@ -417,5 +680,113 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontSize: 14,
     fontWeight: '600',
+  },
+
+  // ESTILOS DEL MODAL DE ERROR PERSONALIZADO
+  errorModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  errorModalIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  errorModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  errorModalMessage: {
+    fontSize: 15,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  errorModalButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  errorModalButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+
+  // ESTILOS DEL MODAL DE BIENVENIDA
+  welcomeModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  welcomeModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  welcomeModalIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  welcomeModalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  welcomeModalMessage: {
+    fontSize: 15,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  welcomeLoader: {
+    marginTop: 8,
   },
 });

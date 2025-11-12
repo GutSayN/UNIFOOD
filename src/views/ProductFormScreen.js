@@ -1,5 +1,9 @@
-// src/screens/ProductFormScreen.js
-import React, { useState, useEffect } from "react";
+/**
+ * Pantalla de Formulario de Producto (Crear/Editar)
+ * Con MVVM - usa useAuthViewModel y useProductViewModel
+ */
+
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,180 +13,274 @@ import {
   Alert,
   ScrollView,
   Image,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Dimensions,
   Modal,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { Picker } from '@react-native-picker/picker';
-import { createProduct, updateProduct, pickImage } from "../services/productService";
-import { getUserData } from "../hooks/useAuth";
+  ActivityIndicator,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+// Usar los nuevos ViewModels
+import { useAuthViewModel } from '../viewmodels/Auth.viewmodel';
+import { useProductViewModel } from '../viewmodels/Product.viewmodel';
+import CONFIG from '../config/app.config';
 
 const { width, height } = Dimensions.get('window');
 
-// Categorías
-const CATEGORIAS = [
-  "Selecciona una categoría",
-  "🍕 Comida Rápida",
-  "🌮 Comida Mexicana",
-  "🍝 Comida Internacional",
-  "🍰 Postres y Repostería",
-  "☕ Bebidas",
-  "🍿 Snacks",
-  "🥗 Saludable",
-  "🌱 Vegetariano/Vegano",
-  "📱 Celulares y Tablets",
-  "💻 Computadoras",
-  "🎮 Videojuegos",
-  "📷 Cámaras y Fotografía",
-  "🎧 Audio y Audífonos",
-  "⌚ Smartwatches",
-  "👕 Ropa Hombre",
-  "👗 Ropa Mujer",
-  "👟 Zapatos",
-  "👜 Bolsos y Carteras",
-  "💍 Joyería y Accesorios",
-  "🏠 Muebles",
-  "🛋️ Decoración",
-  "🍳 Cocina y Comedor",
-  "🛏️ Dormitorio",
-  "🌿 Plantas y Jardín",
-  "⚽ Deportes",
-  "🏋️ Fitness y Gym",
-  "🚴 Bicicletas",
-  "🏃 Running",
-  "🚗 Autos",
-  "🏍️ Motos",
-  "🛴 Patinetas",
-  "📚 Libros",
-  "📝 Material Escolar",
-  "🎨 Arte y Manualidades",
-  "🔧 Servicios Técnicos",
-  "🏠 Servicios para el Hogar",
-  "👨‍🏫 Clases y Tutorías",
-  "💼 Servicios Profesionales",
-  "🐕 Mascotas y Accesorios",
-  "🐾 Comida para Mascotas",
-  "🎁 Regalos",
-  "🎉 Eventos y Fiestas",
-  "📦 Otro",
-];
-
 export default function ProductFormScreen({ navigation, route }) {
   const { product, mode } = route.params || {};
-  const isEditMode = mode === "edit";
+  const isEditMode = mode === 'edit';
 
+  // ViewModels
+  const { user } = useAuthViewModel();
+  const {
+    createProduct,
+    updateProduct,
+    pickImage,
+    isLoading,
+  } = useProductViewModel();
+
+  // Estados del formulario
   const [formData, setFormData] = useState({
-    name: "",
-    price: "",
-    description: "",
-    categoryName: CATEGORIAS[0],
+    name: '',
+    price: '',
+    description: '',
+    categoryName: CONFIG.CATEGORIES[0],
     image: null,
   });
-  const [loading, setLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+
   const [focusedInput, setFocusedInput] = useState(null);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  
+  // Estado para modal de error personalizado
+  const [errorModal, setErrorModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'alert-circle',
+    iconColor: '#ef4444',
+  });
 
+  // Estado para modal de confirmación personalizado
+  const [confirmModal, setConfirmModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'help-circle',
+    iconColor: '#f59e0b',
+    onConfirm: () => {},
+    confirmText: 'Confirmar',
+    cancelText: 'Cancelar',
+  });
+
+  // Estado para modal de éxito personalizado
+  const [successModal, setSuccessModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'checkmark-circle',
+    iconColor: '#10b981',
+    buttonText: 'Ver mis productos',
+    onClose: () => {},
+  });
+
+  // Cargar datos del producto en modo edición
   useEffect(() => {
-    loadUserData();
     if (isEditMode && product) {
       setFormData({
-        name: product.name || "",
-        price: product.price?.toString() || "",
-        description: product.description || "",
-        categoryName: product.categoryName || CATEGORIAS[0],
+        name: product.name || '',
+        price: product.price?.toString() || '',
+        description: product.description || '',
+        categoryName: product.categoryName || CONFIG.CATEGORIES[0],
         image: product.imageUrl ? { uri: product.imageUrl } : null,
       });
     }
-  }, []);
+  }, [isEditMode, product]);
 
-  const loadUserData = async () => {
-    try {
-      const userData = await getUserData();
-      setCurrentUser(userData);
-    } catch (error) {
-      Alert.alert(
-        "Error al cargar usuario",
-        "No se pudo obtener la información del usuario. Por favor intenta de nuevo."
-      );
-    }
+  /**
+   * Mostrar modal de error personalizado
+   */
+  const showError = (title, message, icon = 'alert-circle', iconColor = '#ef4444') => {
+    setErrorModal({
+      visible: true,
+      title,
+      message,
+      icon,
+      iconColor,
+    });
   };
 
+  /**
+   * Mostrar modal de confirmación personalizado
+   */
+  const showConfirm = (title, message, onConfirm, icon = 'help-circle', iconColor = '#f59e0b', confirmText = 'Confirmar', cancelText = 'Cancelar') => {
+    setConfirmModal({
+      visible: true,
+      title,
+      message,
+      icon,
+      iconColor,
+      onConfirm,
+      confirmText,
+      cancelText,
+    });
+  };
+
+  /**
+   * Mostrar modal de éxito personalizado
+   */
+  const showSuccess = (title, message, onClose, icon = 'checkmark-circle', iconColor = '#10b981', buttonText = 'Ver mis productos') => {
+    setSuccessModal({
+      visible: true,
+      title,
+      message,
+      icon,
+      iconColor,
+      buttonText,
+      onClose,
+    });
+  };
+
+  /**
+   * Cerrar modal de error
+   */
+  const closeErrorModal = () => {
+    setErrorModal({ ...errorModal, visible: false });
+  };
+
+  /**
+   * Cerrar modal de confirmación
+   */
+  const closeConfirmModal = () => {
+    setConfirmModal({ ...confirmModal, visible: false });
+  };
+
+  /**
+   * Cerrar modal de éxito
+   */
+  const closeSuccessModal = () => {
+    setSuccessModal({ ...successModal, visible: false });
+  };
+
+  /**
+   * Manejar confirmación
+   */
+  const handleConfirm = () => {
+    confirmModal.onConfirm();
+    closeConfirmModal();
+  };
+
+  /**
+   * Manejar cierre de modal de éxito
+   */
+  const handleSuccessClose = () => {
+    successModal.onClose();
+    closeSuccessModal();
+  };
+
+  /**
+   * Actualizar campo del formulario
+   */
   const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  /**
+   * Seleccionar imagen
+   */
   const handlePickImage = async () => {
-    try {
-      const image = await pickImage();
-      if (image) {
-        setFormData((prev) => ({ ...prev, image }));
-      }
-    } catch (error) {
-      Alert.alert(
-        "Error al seleccionar imagen",
-        "No se pudo seleccionar la imagen. Asegúrate de dar permisos a la aplicación para acceder a tus fotos."
-      );
+    const result = await pickImage();
+
+    if (result.success && result.image) {
+      setFormData(prev => ({ ...prev, image: result.image }));
+    } else if (result.error) {
+      showError('Error al seleccionar imagen', result.error);
     }
   };
 
+  /**
+   * Remover imagen con modal personalizado
+   */
+  const handleRemoveImage = () => {
+    showConfirm(
+      '¿Eliminar imagen?',
+      'Se eliminará la imagen actual del producto. Podrás agregar una nueva después.',
+      () => {
+        setFormData(prev => ({ ...prev, image: null }));
+      },
+      'trash-outline',
+      '#ef4444',
+      'Eliminar',
+      'Cancelar'
+    );
+  };
+
+  /**
+   * Seleccionar categoría
+   */
+  const selectCategory = (category) => {
+    handleInputChange('categoryName', category);
+    setCategoryModalVisible(false);
+  };
+
+  /**
+   * VALIDACIÓN COMPLETA DEL FORMULARIO
+   */
   const validateForm = () => {
     // ========== VALIDAR IMAGEN ==========
     if (!formData.image || !formData.image.uri) {
-      Alert.alert(
-        "Imagen requerida",
-        "Debes agregar una foto de tu producto.\n\nToca el área de la imagen para seleccionar una foto de tu galería."
+      showError(
+        'Imagen requerida',
+        'Debes agregar una foto de tu producto.\n\nToca el área de la imagen para seleccionar una foto de tu galería.',
+        'image-outline',
+        '#f59e0b'
       );
       return false;
     }
 
     // ========== VALIDAR NOMBRE ==========
     if (!formData.name || !formData.name.trim()) {
-      Alert.alert(
-        "Nombre vacío",
-        "El nombre del producto es obligatorio.\n\nPor favor ingresa un nombre para tu producto."
+      showError(
+        'Nombre vacío',
+        'El nombre del producto es obligatorio.\n\nPor favor ingresa un nombre para tu producto.'
       );
       return false;
     }
 
     const trimmedName = formData.name.trim();
 
-    if (trimmedName.length > 25) {
-      Alert.alert(
-        "Nombre muy largo",
-        `El nombre tiene ${trimmedName.length} caracteres.\n\nEl máximo permitido es 25 caracteres.`
+    if (trimmedName.length > CONFIG.VALIDATION.MAX_PRODUCT_NAME_LENGTH) {
+      showError(
+        'Nombre muy largo',
+        `El nombre tiene ${trimmedName.length} caracteres.\n\nEl máximo permitido es ${CONFIG.VALIDATION.MAX_PRODUCT_NAME_LENGTH} caracteres.`
       );
       return false;
     }
 
-    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s]+$/;
-    if (!nameRegex.test(trimmedName)) {
-      Alert.alert(
-        "Nombre inválido",
-        "El nombre solo puede contener letras, números, espacios y acentos.\n\nNo se permiten símbolos especiales."
+    if (!CONFIG.VALIDATION.NAME_REGEX.test(trimmedName)) {
+      showError(
+        'Nombre inválido',
+        'El nombre solo puede contener letras, números y espacios.\n\nNo se permiten símbolos especiales.'
       );
       return false;
     }
 
     // ========== VALIDAR PRECIO ==========
     if (!formData.price || !formData.price.trim()) {
-      Alert.alert(
-        "Precio vacío",
-        "El precio es obligatorio.\n\nPor favor ingresa el precio de tu producto."
+      showError(
+        'Precio vacío',
+        'El precio es obligatorio.\n\nPor favor ingresa el precio de tu producto.'
       );
       return false;
     }
 
     const trimmedPrice = formData.price.trim();
 
-    const priceRegex = /^\d+(\.\d{1,2})?$/;
-    if (!priceRegex.test(trimmedPrice)) {
-      Alert.alert(
-        "Precio inválido",
-        "El precio solo puede contener números.\n\nEjemplos válidos: 100, 99.99, 1250.50"
+    if (!CONFIG.VALIDATION.PRICE_REGEX.test(trimmedPrice)) {
+      showError(
+        'Precio inválido',
+        'El precio solo puede contener números.\n\nEjemplos válidos: 100, 99.99, 1250.50\n\nUsa punto para decimales.'
       );
       return false;
     }
@@ -190,35 +288,37 @@ export default function ProductFormScreen({ navigation, route }) {
     const priceValue = parseFloat(trimmedPrice);
 
     if (priceValue <= 0) {
-      Alert.alert(
-        "Precio muy bajo",
-        "El precio debe ser mayor a 0."
+      showError(
+        'Precio muy bajo',
+        'El precio debe ser mayor a 0.'
       );
       return false;
     }
 
-    if (priceValue > 100000) {
-      Alert.alert(
-        "Precio muy alto",
-        `El precio máximo permitido es $100,000.\n\nPrecio ingresado: $${priceValue.toLocaleString()}`
+    if (priceValue > CONFIG.VALIDATION.MAX_PRODUCT_PRICE) {
+      showError(
+        'Precio muy alto',
+        `El precio máximo permitido es $${CONFIG.VALIDATION.MAX_PRODUCT_PRICE.toLocaleString()}.\n\nPrecio ingresado: $${priceValue.toLocaleString()}`
       );
       return false;
     }
 
     // ========== VALIDAR CATEGORÍA ==========
-    if (!formData.categoryName || formData.categoryName === CATEGORIAS[0]) {
-      Alert.alert(
-        "Categoría no seleccionada",
-        "Debes seleccionar una categoría para tu producto."
+    if (!formData.categoryName || formData.categoryName === CONFIG.CATEGORIES[0]) {
+      showError(
+        'Categoría no seleccionada',
+        'Debes seleccionar una categoría para tu producto.',
+        'pricetag-outline',
+        '#f59e0b'
       );
       return false;
     }
 
     // ========== VALIDAR DESCRIPCIÓN ==========
     if (!formData.description || !formData.description.trim()) {
-      Alert.alert(
-        "Descripción vacía",
-        "La descripción es obligatoria.\n\nPor favor describe tu producto."
+      showError(
+        'Descripción vacía',
+        'La descripción es obligatoria.\n\nPor favor describe tu producto.'
       );
       return false;
     }
@@ -227,19 +327,19 @@ export default function ProductFormScreen({ navigation, route }) {
     const words = trimmedDesc.split(/\s+/).filter(w => w.length > 0);
     const wordCount = words.length;
 
-    if (wordCount > 100) {
-      Alert.alert(
-        "Descripción muy larga",
-        `La descripción tiene ${wordCount} palabras.\n\nEl máximo permitido es 100 palabras.`
+    if (wordCount > CONFIG.VALIDATION.MAX_PRODUCT_DESCRIPTION_WORDS) {
+      showError(
+        'Descripción muy larga',
+        `La descripción tiene ${wordCount} palabras.\n\nEl máximo permitido es ${CONFIG.VALIDATION.MAX_PRODUCT_DESCRIPTION_WORDS} palabras.`
       );
       return false;
     }
 
     const descRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s,\.]+$/;
     if (!descRegex.test(trimmedDesc)) {
-      Alert.alert(
-        "Descripción inválida",
-        "La descripción solo puede contener letras, números, espacios, acentos, comas y puntos.\n\nNo se permiten otros símbolos especiales."
+      showError(
+        'Descripción inválida',
+        'La descripción solo puede contener letras, números, espacios, acentos, comas y puntos.\n\nNo se permiten otros símbolos especiales.'
       );
       return false;
     }
@@ -247,128 +347,207 @@ export default function ProductFormScreen({ navigation, route }) {
     return true;
   };
 
+  /**
+   * ENVIAR FORMULARIO CON MANEJO COMPLETO DE ERRORES
+   */
   const handleSubmit = async () => {
-  if (!validateForm()) {
-    return;
-  }
-
-  if (!currentUser) {
-    Alert.alert(
-      "Error de sesión",
-      "No se pudo obtener la información del usuario.\n\nPor favor cierra sesión e inicia sesión nuevamente."
-    );
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const productData = {
-      name: formData.name.trim(),
-      price: parseFloat(formData.price),
-      description: formData.description.trim(),
-      categoryName: formData.categoryName,
-      image: formData.image,
-    };
-
-    if (!isEditMode) {
-      productData.userId = currentUser.userId || currentUser.id;
+    // Validar formulario
+    if (!validateForm()) {
+      return;
     }
 
-    let response;
-    if (isEditMode) {
-      response = await updateProduct(product.productId, productData);
-    } else {
-      response = await createProduct(productData);
-    }
-
-    if (response.isSuccess) {
-      Alert.alert(
-        "¡Éxito!",
-        `Tu producto "${productData.name}" ha sido ${isEditMode ? 'actualizado' : 'publicado'} correctamente.`,
-        [
-          {
-            text: "Ver productos",
-            onPress: () => navigation.navigate("Home"),
-          },
-        ]
+    if (!user) {
+      showError(
+        'Error de sesión',
+        'No se pudo obtener la información del usuario.\n\nPor favor cierra sesión e inicia sesión nuevamente.'
       );
-    } else {
-      let errorMessage = "No se pudo guardar el producto.";
-      
-      if (response.message) {
-        if (response.message.includes("price must not be greater than")) {
-          errorMessage = "El precio máximo permitido es $100,000.\n\nPor favor reduce el precio e intenta de nuevo.";
+      return;
+    }
+
+    let result;
+
+    try {
+      if (isEditMode) {
+        result = await updateProduct(product.productId, formData);
+      } else {
+        result = await createProduct(formData, user.id);
+      }
+
+      if (result.success) {
+        showSuccess(
+          '✅ ¡Éxito!',
+          isEditMode ? 'Tu producto ha sido actualizado correctamente y ya está disponible en tu catálogo.' : 'Tu producto ha sido creado correctamente y ya está visible para todos los usuarios.',
+          () => {
+            // Resetear la navegación: Home → ProductsList
+            navigation.reset({
+              index: 1,
+              routes: [
+                { name: 'Home' },
+                { name: 'ProductsList' }
+              ],
+            });
+          },
+          'checkmark-circle',
+          '#10b981',
+          'Ver mis productos'
+        );
+      } else {
+        // Manejar errores del resultado
+        if (result.error) {
+          const errorMsg = result.error.toLowerCase();
+          
+          // DETECTAR MALAS PALABRAS
+          if (errorMsg.includes("lenguaje inapropiado") || 
+              errorMsg.includes("malas palabras") ||
+              errorMsg.includes("palabras ofensivas") ||
+              errorMsg.includes("contenido ofensivo")) {
+            
+            showError(
+              '🚫 Lenguaje inapropiado',
+              'El texto contiene lenguaje inapropiado en el nombre, descripción o categoría.\n\nPor favor revisa y corrige el contenido.',
+              'close-circle',
+              '#ef4444'
+            );
+            
+          // DETECTAR IMAGEN RECHAZADA
+          } else if (errorMsg.includes("imagen rechazada") || 
+              errorMsg.includes("contenido sensible") || 
+              errorMsg.includes("contenido violento") ||
+              errorMsg.includes("contenido inapropiado") ||
+              errorMsg.includes("inappropriate")) {
+            
+            showError(
+              '🚫 Imagen no permitida',
+              'La imagen que seleccionaste contiene contenido inapropiado, sensible o violento.\n\nPor favor selecciona una imagen diferente que cumpla con nuestras políticas de contenido.',
+              'close-circle',
+              '#ef4444'
+            );
+            
+            // Limpiar la imagen rechazada
+            setFormData(prev => ({ ...prev, image: null }));
+            
+          } else if (errorMsg.includes("price must not be greater than") || 
+                     errorMsg.includes("precio")) {
+            showError(
+              'Precio muy alto',
+              'El precio máximo permitido es $999,999.99\n\nPor favor reduce el precio e intenta de nuevo.',
+              'cash-outline',
+              '#f59e0b'
+            );
+          } else {
+            showError(
+              'No se pudo guardar',
+              result.error + '\n\nPor favor verifica los datos e intenta de nuevo.'
+            );
+          }
         } else {
-          errorMessage = response.message;
+          showError(
+            'Error desconocido',
+            'No se pudo guardar el producto.\n\nPor favor intenta de nuevo.'
+          );
         }
       }
+    } catch (error) {
+      // Manejar excepciones
+      let errorTitle = "Error al guardar";
+      let errorMessage = "Ocurrió un problema al guardar el producto.";
+      let errorIcon = 'alert-circle';
+      let errorColor = '#ef4444';
       
-      Alert.alert(
-        "No se pudo guardar",
-        errorMessage + "\n\nPor favor verifica los datos e intenta de nuevo."
-      );
-    }
-  } catch (error) {
-    // ✅ ELIMINADO: console.error("Error completo:", error);
-    
-    let errorTitle = "Error al guardar";
-    let errorMessage = "Ocurrió un problema al guardar el producto.";
-    
-    if (error.message) {
-      const errorMsg = error.message.toLowerCase();
-      
-      // ✅ VALIDACIÓN ESPECÍFICA PARA IMAGEN RECHAZADA
-      if (errorMsg.includes("imagen rechazada") || 
-          errorMsg.includes("contenido sensible") || 
-          errorMsg.includes("contenido violento") ||
-          errorMsg.includes("inappropriate")) {
+      if (error.message) {
+        const errorMsg = error.message.toLowerCase();
         
-        errorTitle = "🚫 Imagen no permitida";
-        errorMessage = "La imagen que seleccionaste contiene contenido inapropiado, sensible o violento.\n\n" +
-                      "Por favor selecciona una imagen diferente que cumpla con nuestras políticas de contenido.";
-        
-        // Limpiar la imagen rechazada
-        setFormData((prev) => ({ ...prev, image: null }));
-        
-      } else if (errorMsg.includes("network") || errorMsg.includes("conexión")) {
-        errorMessage = "Error de conexión a internet.\n\nVerifica tu conexión e intenta de nuevo.";
-      } else if (errorMsg.includes("400") || errorMsg.includes("bad request")) {
-        // Para errores 400 genéricos, intentar extraer el mensaje del servidor
-        try {
-          const jsonMatch = error.message.match(/\{.*\}/);
-          if (jsonMatch) {
-            const errorData = JSON.parse(jsonMatch[0]);
-            if (errorData.message && 
-                (errorData.message.includes("IMAGEN RECHAZADA") || 
-                 errorData.message.includes("contenido sensible"))) {
-              errorTitle = "🚫 Imagen no permitida";
-              errorMessage = "La imagen que seleccionaste contiene contenido inapropiado.\n\n" +
-                            "Por favor selecciona una imagen diferente que cumpla con nuestras políticas.";
-              setFormData((prev) => ({ ...prev, image: null }));
+        // VALIDACIÓN ESPECÍFICA PARA MALAS PALABRAS
+        if (errorMsg.includes("lenguaje inapropiado") || 
+            errorMsg.includes("malas palabras") ||
+            errorMsg.includes("palabras ofensivas") ||
+            errorMsg.includes("contenido ofensivo")) {
+          
+          errorTitle = "🚫 Lenguaje inapropiado";
+          errorMessage = "El texto contiene lenguaje inapropiado en el nombre, descripción o categoría.\n\n" +
+                        "Por favor revisa y corrige el contenido.";
+          errorIcon = 'close-circle';
+          
+        // VALIDACIÓN ESPECÍFICA PARA IMAGEN RECHAZADA
+        } else if (errorMsg.includes("imagen rechazada") || 
+            errorMsg.includes("contenido sensible") || 
+            errorMsg.includes("contenido violento") ||
+            errorMsg.includes("contenido inapropiado") ||
+            errorMsg.includes("inappropriate")) {
+          
+          errorTitle = "🚫 Imagen no permitida";
+          errorMessage = "La imagen que seleccionaste contiene contenido inapropiado, sensible o violento.\n\n" +
+                        "Por favor selecciona una imagen diferente que cumpla con nuestras políticas de contenido.";
+          errorIcon = 'close-circle';
+          
+          // Limpiar la imagen rechazada
+          setFormData(prev => ({ ...prev, image: null }));
+          
+        } else if (errorMsg.includes("network") || errorMsg.includes("conexión")) {
+          errorTitle = "Sin conexión";
+          errorMessage = "Error de conexión a internet.\n\nVerifica tu conexión e intenta de nuevo.";
+          errorIcon = 'cloud-offline-outline';
+          errorColor = '#f59e0b';
+          
+        } else if (errorMsg.includes("400") || errorMsg.includes("bad request")) {
+          // Para errores 400 genéricos, intentar extraer el mensaje del servidor
+          try {
+            const jsonMatch = error.message.match(/\{.*\}/);
+            if (jsonMatch) {
+              const errorData = JSON.parse(jsonMatch[0]);
+              if (errorData.message) {
+                const serverMsg = errorData.message.toLowerCase();
+                
+                // Detectar malas palabras del servidor
+                if (serverMsg.includes("lenguaje inapropiado") ||
+                    serverMsg.includes("malas palabras") ||
+                    serverMsg.includes("palabras ofensivas")) {
+                  errorTitle = "🚫 Lenguaje inapropiado";
+                  errorMessage = "El texto contiene lenguaje inapropiado.\n\n" +
+                                "Por favor revisa el nombre, descripción y categoría.";
+                  errorIcon = 'close-circle';
+                  
+                // Detectar imagen rechazada del servidor
+                } else if (serverMsg.includes("imagen rechazada") || 
+                    serverMsg.includes("contenido sensible") ||
+                    serverMsg.includes("contenido inapropiado")) {
+                  errorTitle = "🚫 Imagen no permitida";
+                  errorMessage = "La imagen que seleccionaste contiene contenido inapropiado.\n\n" +
+                                "Por favor selecciona una imagen diferente que cumpla con nuestras políticas.";
+                  errorIcon = 'close-circle';
+                  setFormData(prev => ({ ...prev, image: null }));
+                } else {
+                  errorMessage = errorData.message + "\n\nRevisa el formulario e intenta de nuevo.";
+                }
+              } else {
+                errorMessage = "Los datos ingresados no son válidos.\n\nRevisa el formulario e intenta de nuevo.";
+              }
             } else {
-              errorMessage = errorData.message || "Los datos ingresados no son válidos.\n\nRevisa el formulario e intenta de nuevo.";
+              errorMessage = "Los datos ingresados no son válidos.\n\nRevisa el formulario e intenta de nuevo.";
             }
-          } else {
+          } catch (parseError) {
             errorMessage = "Los datos ingresados no son válidos.\n\nRevisa el formulario e intenta de nuevo.";
           }
-        } catch (parseError) {
-          errorMessage = "Los datos ingresados no son válidos.\n\nRevisa el formulario e intenta de nuevo.";
+          
+        } else if (errorMsg.includes("price must not be greater than")) {
+          errorTitle = "Precio muy alto";
+          errorMessage = "El precio máximo permitido es $999,999.99\n\nPor favor reduce el precio.";
+          errorIcon = 'cash-outline';
+          errorColor = '#f59e0b';
+          
+        } else {
+          // Mostrar el mensaje original del servidor si está disponible
+          errorMessage = error.message;
         }
-      } else if (errorMsg.includes("price must not be greater than")) {
-        errorMessage = "El precio máximo permitido es $100,000.\n\nPor favor reduce el precio.";
-      } else {
-        // Mostrar el mensaje original del servidor si está disponible
-        errorMessage = error.message;
       }
+      
+      showError(errorTitle, errorMessage, errorIcon, errorColor);
     }
-    
-    Alert.alert(errorTitle, errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
+  /**
+   * Obtener URI de imagen
+   */
   const getImageUri = () => {
     if (formData.image && formData.image.uri) {
       return formData.image.uri;
@@ -376,196 +555,271 @@ export default function ProductFormScreen({ navigation, route }) {
     return null;
   };
 
-  const selectCategory = (category) => {
-    handleInputChange("categoryName", category);
-    setCategoryModalVisible(false);
-  };
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Header con gradiente */}
         <View style={styles.header}>
           <View style={styles.headerBackground}>
             <View style={styles.circle1} />
             <View style={styles.circle2} />
+            <View style={styles.circle3} />
           </View>
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
+            disabled={isLoading}
           >
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {isEditMode ? "Editar Producto" : "Nuevo Producto"}
-          </Text>
-          <View style={{ width: 40 }} />
+
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>
+              {isEditMode ? 'Editar Producto' : 'Nuevo Producto'}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              {isEditMode ? 'Actualiza la información' : 'Completa los datos'}
+            </Text>
+          </View>
+
+          <View style={styles.headerPlaceholder} />
         </View>
 
-        {/* Imagen CON INDICADOR DE REQUERIDO */}
-        <TouchableOpacity
-          style={[
-            styles.imageContainer,
-            !formData.image && styles.imageContainerRequired
-          ]}
-          onPress={handlePickImage}
-          activeOpacity={0.8}
-        >
-          {getImageUri() ? (
-            <>
-              <Image
-                source={{ uri: getImageUri() }}
-                style={styles.image}
-                resizeMode="cover"
-              />
-              <View style={styles.imageOverlay}>
-                <View style={styles.changeImageButton}>
-                  <Ionicons name="camera" size={20} color="#fff" />
-                  <Text style={styles.changeImageText}>Cambiar foto</Text>
-                </View>
-              </View>
-            </>
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <View style={styles.iconCircle}>
-                <Ionicons name="camera" size={40} color="#059669" />
-              </View>
-              <Text style={styles.imagePlaceholderText}>
-                Toca para agregar foto 
-              </Text>
-              <Text style={styles.imagePlaceholderSubtext}>
-                La imagen es obligatoria
-              </Text>
-              <View style={styles.requiredBadge}>
-                <Ionicons name="alert-circle" size={16} color="#ef4444" />
-                <Text style={styles.requiredBadgeText}>Requerido</Text>
-              </View>
-              <Text style={styles.imageWarning}>
-                ⚠️ No se permiten imágenes con contenido inapropiado
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
         {/* Formulario */}
-        <View style={styles.form}>
-          {/* Nombre */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>
-              <Ionicons name="text-outline" size={16} color="#059669" /> Nombre del producto *
-            </Text>
-            <View style={[
-              styles.inputWrapper,
-              focusedInput === 'name' && styles.inputWrapperFocused
-            ]}>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: Pizza Margarita"
-                value={formData.name}
-                onChangeText={(value) => handleInputChange("name", value)}
-                placeholderTextColor="#9ca3af"
-                maxLength={25}
-                onFocus={() => setFocusedInput('name')}
-                onBlur={() => setFocusedInput(null)}
-              />
+        <View style={styles.formContainer}>
+          {/* Sección de Imagen */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIndicator} />
+              <Text style={styles.sectionTitle}>Imagen del Producto</Text>
             </View>
-            <View style={styles.helperRow}>
-              <Text style={styles.helperText}>Solo letras, números y acentos</Text>
-              <Text style={[
-                styles.charCount,
-                formData.name.length > 20 && styles.charCountWarning
-              ]}>{formData.name.length}/25</Text>
-            </View>
-          </View>
 
-          {/* Precio */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>
-              <Ionicons name="cash-outline" size={16} color="#059669" /> Precio * (máx. $100,000)
-            </Text>
-            <View style={[
-              styles.priceInputContainer,
-              focusedInput === 'price' && styles.inputWrapperFocused
-            ]}>
-              <Text style={styles.currencySymbol}>$</Text>
-              <TextInput
-                style={styles.priceInput}
-                placeholder="0.00"
-                value={formData.price}
-                onChangeText={(value) => handleInputChange("price", value)}
-                keyboardType="decimal-pad"
-                placeholderTextColor="#9ca3af"
-                onFocus={() => setFocusedInput('price')}
-                onBlur={() => setFocusedInput(null)}
-              />
-            </View>
-            <Text style={styles.helperText}>Solo números (usar punto para decimales)</Text>
-          </View>
-
-          {/* Categoría - SELECTOR MEJORADO */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>
-              <Ionicons name="pricetag-outline" size={16} color="#059669" /> Categoría *
-            </Text>
             <TouchableOpacity
-              style={styles.categorySelector}
-              onPress={() => setCategoryModalVisible(true)}
-              activeOpacity={0.7}
+              style={styles.imageContainer}
+              onPress={handlePickImage}
+              activeOpacity={0.8}
+              disabled={isLoading}
             >
-              <Text style={[
-                styles.categorySelectorText,
-                formData.categoryName === CATEGORIAS[0] && styles.categorySelectorPlaceholder
-              ]}>
-                {formData.categoryName}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color="#059669" />
+              {getImageUri() ? (
+                <>
+                  <Image source={{ uri: getImageUri() }} style={styles.productImage} />
+                  <View style={styles.imageOverlay}>
+                    <Ionicons name="camera" size={32} color="white" />
+                    <Text style={styles.imageOverlayText}>Cambiar imagen</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={handleRemoveImage}
+                    disabled={isLoading}
+                  >
+                    <Ionicons name="close-circle" size={32} color="#ef4444" />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <View style={styles.imagePlaceholderCircle}>
+                    <Ionicons name="camera-outline" size={48} color="#059669" />
+                  </View>
+                  <Text style={styles.imagePlaceholderText}>Toca para agregar imagen</Text>
+                  <Text style={styles.imagePlaceholderSubtext}>Requerido</Text>
+                  <View style={styles.requiredBadge}>
+                    <Ionicons name="alert-circle" size={16} color="#ef4444" />
+                    <Text style={styles.requiredBadgeText}>Obligatorio</Text>
+                  </View>
+                  <Text style={styles.imageWarning}>
+                    ⚠️ No se permiten imágenes inapropiadas
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
-          {/* Descripción */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>
-              <Ionicons name="document-text-outline" size={16} color="#059669" /> Descripción * (máx. 100 palabras)
-            </Text>
-            <View style={[
-              styles.inputWrapper,
-              focusedInput === 'description' && styles.inputWrapperFocused
-            ]}>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Describe tu producto..."
-                value={formData.description}
-                onChangeText={(value) => handleInputChange("description", value)}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-                placeholderTextColor="#9ca3af"
-                onFocus={() => setFocusedInput('description')}
-                onBlur={() => setFocusedInput(null)}
-              />
+          {/* Nombre del Producto */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIndicator} />
+              <Text style={styles.sectionTitle}>Información Básica</Text>
             </View>
-            <View style={styles.helperRow}>
-              <Text style={styles.helperText}>Solo letras, números, acentos, comas y puntos</Text>
-              <Text style={[
-                styles.charCount,
-                formData.description.trim().split(/\s+/).filter(w => w).length > 90 && styles.charCountWarning
-              ]}>
-                {formData.description.trim().split(/\s+/).filter(w => w).length}/100
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Nombre del Producto <Text style={styles.required}>*</Text>
               </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  focusedInput === 'name' && styles.inputWrapperFocused,
+                ]}
+              >
+                <Ionicons
+                  name="pricetag-outline"
+                  size={20}
+                  color={focusedInput === 'name' ? '#059669' : '#6b7280'}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: Tacos al Pastor"
+                  placeholderTextColor="#9ca3af"
+                  value={formData.name}
+                  onChangeText={(value) => handleInputChange('name', value)}
+                  onFocus={() => setFocusedInput('name')}
+                  onBlur={() => setFocusedInput(null)}
+                  maxLength={CONFIG.VALIDATION.MAX_PRODUCT_NAME_LENGTH}
+                  editable={!isLoading}
+                />
+              </View>
+              {formData.name.length > 0 && (
+                <Text
+                  style={[
+                    styles.charCounter,
+                    formData.name.length >= CONFIG.VALIDATION.MAX_PRODUCT_NAME_LENGTH - 20 && styles.charCounterWarning,
+                  ]}
+                >
+                  {formData.name.length}/{CONFIG.VALIDATION.MAX_PRODUCT_NAME_LENGTH} caracteres
+                </Text>
+              )}
+            </View>
+
+            {/* Precio */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Precio <Text style={styles.required}>*</Text>
+              </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  focusedInput === 'price' && styles.inputWrapperFocused,
+                ]}
+              >
+                <View style={styles.pricePrefix}>
+                  <Text style={styles.pricePrefixText}>$</Text>
+                </View>
+                <TextInput
+                  style={[styles.input, styles.priceInput]}
+                  placeholder="0.00"
+                  placeholderTextColor="#9ca3af"
+                  value={formData.price}
+                  onChangeText={(value) => {
+                    // Solo permitir números y un punto decimal
+                    const cleaned = value.replace(/[^0-9.]/g, '');
+                    const parts = cleaned.split('.');
+                    if (parts.length > 2) return;
+                    if (parts[1] && parts[1].length > 2) return;
+                    handleInputChange('price', cleaned);
+                  }}
+                  keyboardType="decimal-pad"
+                  onFocus={() => setFocusedInput('price')}
+                  onBlur={() => setFocusedInput(null)}
+                  editable={!isLoading}
+                />
+                <Text style={styles.priceSuffix}>MXN</Text>
+              </View>
+              {formData.price && (
+                <View style={styles.pricePreview}>
+                  <Ionicons name="cash-outline" size={16} color="#059669" />
+                  <Text style={styles.pricePreviewText}>
+                    Precio: ${parseFloat(formData.price || 0).toLocaleString('es-MX', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{' '}
+                    MXN
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.helperText}>
+                Máximo: $999,999.99 MXN
+              </Text>
+            </View>
+
+            {/* Categoría */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Categoría <Text style={styles.required}>*</Text>
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.inputWrapper,
+                  styles.categoryButton,
+                  focusedInput === 'category' && styles.inputWrapperFocused,
+                ]}
+                onPress={() => setCategoryModalVisible(true)}
+                activeOpacity={0.7}
+                disabled={isLoading}
+              >
+                <Ionicons
+                  name="pricetag-outline"
+                  size={20}
+                  color="#059669"
+                  style={styles.inputIcon}
+                />
+                <Text style={styles.categoryButtonText}>{formData.categoryName}</Text>
+                <Ionicons name="chevron-down" size={20} color="#6b7280" />
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Info del usuario */}
-          {currentUser && (
+          {/* Descripción */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIndicator} />
+              <Text style={styles.sectionTitle}>Descripción</Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Descripción del Producto <Text style={styles.required}>*</Text>
+              </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  styles.textAreaWrapper,
+                  focusedInput === 'description' && styles.inputWrapperFocused,
+                ]}
+              >
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Describe tu producto: ingredientes, sabor, tamaño, etc."
+                  placeholderTextColor="#9ca3af"
+                  value={formData.description}
+                  onChangeText={(value) => handleInputChange('description', value)}
+                  multiline
+                  numberOfLines={4}
+                  onFocus={() => setFocusedInput('description')}
+                  onBlur={() => setFocusedInput(null)}
+                  textAlignVertical="top"
+                  editable={!isLoading}
+                />
+              </View>
+              {formData.description.length > 0 && (
+                <Text
+                  style={[
+                    styles.charCounter,
+                    formData.description.trim().split(/\s+/).filter(w => w).length >= CONFIG.VALIDATION.MAX_PRODUCT_DESCRIPTION_WORDS - 10 && styles.charCounterWarning,
+                  ]}
+                >
+                  {formData.description.trim().split(/\s+/).filter(w => w).length}/{CONFIG.VALIDATION.MAX_PRODUCT_DESCRIPTION_WORDS} palabras
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Info del usuario (Número de teléfono) */}
+          {user && (
             <View style={styles.userInfoContainer}>
               <Ionicons name="call-outline" size={20} color="#059669" />
               <View style={styles.userInfoText}>
                 <Text style={styles.userInfoLabel}>Contacto</Text>
                 <Text style={styles.userInfoPhone}>
-                  {currentUser.phoneNumber || currentUser.phone || "Sin número registrado"}
+                  {user.phoneNumber || user.phone || "Sin número registrado"}
                 </Text>
                 <Text style={styles.userInfoSubtext}>
                   Los compradores podrán contactarte por WhatsApp
@@ -574,61 +828,168 @@ export default function ProductFormScreen({ navigation, route }) {
             </View>
           )}
 
-          {/* Botón de envío */}
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.submitButtonText}>
-                  {isEditMode ? "Guardar Cambios" : "Publicar Producto"}
-                </Text>
-                <Ionicons name="checkmark-circle" size={22} color="#fff" />
-              </>
-            )}
-          </TouchableOpacity>
+          {/* Botones de Acción */}
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.8}
+              disabled={isLoading}
+            >
+              <Ionicons name="close-circle-outline" size={20} color="#6b7280" />
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              activeOpacity={0.8}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text style={styles.submitButtonText}>Guardando...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons
+                    name={isEditMode ? 'checkmark-circle' : 'add-circle'}
+                    size={20}
+                    color="#fff"
+                  />
+                  <Text style={styles.submitButtonText}>
+                    {isEditMode ? 'Actualizar' : 'Publicar'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
-      {/* Modal de Categorías */}
+      {/* MODAL DE ERROR PERSONALIZADO */}
       <Modal
-        visible={categoryModalVisible}
+        visible={errorModal.visible}
         transparent={true}
-        animationType="slide"
-        onRequestClose={() => setCategoryModalVisible(false)}
+        animationType="fade"
+        onRequestClose={closeErrorModal}
       >
+        <View style={styles.errorModalOverlay}>
+          <View style={styles.errorModalContent}>
+            <View style={[styles.errorModalIcon, { backgroundColor: `${errorModal.iconColor}15` }]}>
+              <Ionicons name={errorModal.icon} size={48} color={errorModal.iconColor} />
+            </View>
+            
+            <Text style={styles.errorModalTitle}>{errorModal.title}</Text>
+            <Text style={styles.errorModalMessage}>{errorModal.message}</Text>
+            
+            <TouchableOpacity
+              style={[styles.errorModalButton, { backgroundColor: errorModal.iconColor }]}
+              onPress={closeErrorModal}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.errorModalButtonText}>Entendido</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL DE CONFIRMACIÓN PERSONALIZADO */}
+      <Modal
+        visible={confirmModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeConfirmModal}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <View style={styles.confirmModalContent}>
+            <View style={[styles.confirmModalIcon, { backgroundColor: `${confirmModal.iconColor}15` }]}>
+              <Ionicons name={confirmModal.icon} size={48} color={confirmModal.iconColor} />
+            </View>
+            
+            <Text style={styles.confirmModalTitle}>{confirmModal.title}</Text>
+            <Text style={styles.confirmModalMessage}>{confirmModal.message}</Text>
+            
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity
+                style={styles.confirmModalCancelButton}
+                onPress={closeConfirmModal}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.confirmModalCancelText}>{confirmModal.cancelText}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.confirmModalConfirmButton, { backgroundColor: confirmModal.iconColor }]}
+                onPress={handleConfirm}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.confirmModalConfirmText}>{confirmModal.confirmText}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL DE ÉXITO PERSONALIZADO */}
+      <Modal
+        visible={successModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeSuccessModal}
+      >
+        <View style={styles.successModalOverlay}>
+          <View style={styles.successModalContent}>
+            <View style={[styles.successModalIcon, { backgroundColor: `${successModal.iconColor}15` }]}>
+              <Ionicons name={successModal.icon} size={64} color={successModal.iconColor} />
+            </View>
+            
+            <Text style={styles.successModalTitle}>{successModal.title}</Text>
+            <Text style={styles.successModalMessage}>{successModal.message}</Text>
+            
+            <TouchableOpacity
+              style={[styles.successModalButton, { backgroundColor: successModal.iconColor }]}
+              onPress={handleSuccessClose}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.successModalButtonText}>{successModal.buttonText}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Categorías */}
+      <Modal visible={categoryModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Selecciona una categoría</Text>
+              <Text style={styles.modalTitle}>Selecciona una Categoría</Text>
               <TouchableOpacity
-                onPress={() => setCategoryModalVisible(false)}
                 style={styles.modalCloseButton}
+                onPress={() => setCategoryModalVisible(false)}
               >
-                <Ionicons name="close-circle" size={28} color="#6b7280" />
+                <Ionicons name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
             </View>
-            
-            <ScrollView style={styles.categoryList} showsVerticalScrollIndicator={false}>
-              {CATEGORIAS.slice(1).map((category, index) => (
+
+            <ScrollView style={styles.categoriesContainer} showsVerticalScrollIndicator={false}>
+              {CONFIG.CATEGORIES.filter(cat => cat !== CONFIG.CATEGORIES[0]).map((category, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
-                    styles.categoryItem,
-                    formData.categoryName === category && styles.categoryItemSelected
+                    styles.categoryOption,
+                    formData.categoryName === category && styles.categoryOptionSelected,
                   ]}
                   onPress={() => selectCategory(category)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[
-                    styles.categoryItemText,
-                    formData.categoryName === category && styles.categoryItemTextSelected
-                  ]}>
+                  <Text
+                    style={[
+                      styles.categoryOptionText,
+                      formData.categoryName === category && styles.categoryOptionTextSelected,
+                    ]}
+                  >
                     {category}
                   </Text>
                   {formData.categoryName === category && (
@@ -647,19 +1008,20 @@ export default function ProductFormScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0fdf4",
+    backgroundColor: '#f0fdf4',
   },
-  scrollContent: {
+  scrollContainer: {
+    flexGrow: 1,
     paddingBottom: 30,
   },
   header: {
     position: 'relative',
-    paddingTop: 50,
-    paddingBottom: 20,
     paddingHorizontal: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    paddingTop: 50,
+    paddingBottom: 30,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     overflow: 'hidden',
   },
   headerBackground: {
@@ -672,84 +1034,143 @@ const styles = StyleSheet.create({
   },
   circle1: {
     position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: '#059669',
+    opacity: 0.2,
+    top: -80,
+    right: -60,
+  },
+  circle2: {
+    position: 'absolute',
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: '#059669',
-    opacity: 0.3,
-    top: -50,
-    right: -30,
+    backgroundColor: '#10b981',
+    opacity: 0.15,
+    bottom: -40,
+    left: -40,
   },
-  circle2: {
+  circle3: {
     position: 'absolute',
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#10b981',
-    opacity: 0.2,
-    bottom: -20,
-    left: -20,
+    backgroundColor: '#34d399',
+    opacity: 0.1,
+    top: 50,
+    left: '40%',
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 16,
     zIndex: 1,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-    color: "#fff",
-    zIndex: 1,
+    fontWeight: 'bold',
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: '#d1fae5',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  headerPlaceholder: {
+    width: 44,
+  },
+  formContainer: {
+    padding: 20,
+  },
+  section: {
+    marginBottom: 28,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionIndicator: {
+    width: 4,
+    height: 20,
+    backgroundColor: '#059669',
+    borderRadius: 2,
+    marginRight: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#065f46',
   },
   imageContainer: {
-    width: "100%",
-    height: 250,
-    backgroundColor: "#fff",
-    marginBottom: 20,
+    width: '100%',
+    height: 240,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
     position: 'relative',
   },
-  imageContainerRequired: {
-    borderWidth: 3,
-    borderColor: '#fbbf24',
-    borderStyle: 'dashed',
-  },
-  image: {
-    width: "100%",
-    height: "100%",
+  productImage: {
+    width: '100%',
+    height: '100%',
   },
   imageOverlay: {
     position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    padding: 12,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
+    opacity: 0,
   },
-  changeImageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  changeImageText: {
+  imageOverlayText: {
     color: '#fff',
+    marginTop: 8,
     fontSize: 14,
     fontWeight: '600',
   },
+  removeImageButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   imagePlaceholder: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: '#f9fafb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  imagePlaceholderCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#d1fae5',
     justifyContent: 'center',
     alignItems: 'center',
@@ -757,13 +1178,13 @@ const styles = StyleSheet.create({
   },
   imagePlaceholderText: {
     fontSize: 16,
-    color: "#065f46",
     fontWeight: '600',
-    marginBottom: 4,
+    color: '#065f46',
+    marginBottom: 6,
   },
   imagePlaceholderSubtext: {
     fontSize: 13,
-    color: "#6b7280",
+    color: '#6b7280',
     marginBottom: 12,
   },
   requiredBadge: {
@@ -789,101 +1210,126 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
     marginTop: 4,
-    paddingHorizontal: 20,
-  },
-  form: {
-    paddingHorizontal: 20,
   },
   inputGroup: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#065f46",
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#065f46',
     marginBottom: 10,
   },
+  required: {
+    color: '#ef4444',
+    fontWeight: 'bold',
+  },
   inputWrapper: {
-    backgroundColor: "#fff",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: "#e5e7eb",
+    borderColor: '#e5e7eb',
+    paddingHorizontal: 14,
+    minHeight: 52,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   inputWrapperFocused: {
-    borderColor: "#059669",
-    backgroundColor: "#f0fdf4",
+    borderColor: '#059669',
+    backgroundColor: '#f0fdf4',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inputIcon: {
+    marginRight: 10,
   },
   input: {
-    padding: 14,
-    fontSize: 16,
-    color: "#1f2937",
+    flex: 1,
+    fontSize: 15,
+    color: '#1f2937',
     fontWeight: '500',
   },
-  priceInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#e5e7eb",
+  pricePrefix: {
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginRight: 10,
   },
-  currencySymbol: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#059669",
-    paddingLeft: 14,
+  pricePrefixText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#059669',
   },
   priceInput: {
-    flex: 1,
-    padding: 14,
-    fontSize: 16,
-    color: "#1f2937",
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '600',
   },
-  categorySelector: {
+  priceSuffix: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  pricePreview: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#059669",
-    padding: 16,
+    marginTop: 8,
+    paddingHorizontal: 4,
+    gap: 6,
   },
-  categorySelectorText: {
-    fontSize: 16,
-    color: "#1f2937",
-    fontWeight: '500',
-    flex: 1,
-  },
-  categorySelectorPlaceholder: {
-    color: "#9ca3af",
-  },
-  textArea: {
-    height: 100,
-    paddingTop: 14,
-  },
-  helperRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
+  pricePreviewText: {
+    fontSize: 14,
+    color: '#059669',
+    fontWeight: '600',
   },
   helperText: {
     fontSize: 12,
-    color: "#6b7280",
-    fontStyle: "italic",
+    color: '#6b7280',
+    marginTop: 6,
+    fontStyle: 'italic',
   },
-  charCount: {
-    fontSize: 12,
-    color: "#059669",
+  categoryButton: {
+    justifyContent: 'space-between',
+  },
+  categoryButtonText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1f2937',
     fontWeight: '600',
   },
-  charCountWarning: {
-    color: "#f59e0b",
+  textAreaWrapper: {
+    minHeight: 120,
+    alignItems: 'flex-start',
+    paddingTop: 14,
+    paddingBottom: 14,
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  charCounter: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 6,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  charCounterWarning: {
+    color: '#f59e0b',
+    fontWeight: '600',
   },
   userInfoContainer: {
     flexDirection: 'row',
-    backgroundColor: "#d1fae5",
+    backgroundColor: '#d1fae5',
     padding: 16,
     borderRadius: 14,
     marginBottom: 20,
@@ -895,45 +1341,272 @@ const styles = StyleSheet.create({
   },
   userInfoLabel: {
     fontSize: 13,
-    fontWeight: "600",
-    color: "#065f46",
+    fontWeight: '600',
+    color: '#065f46',
     marginBottom: 4,
   },
   userInfoPhone: {
     fontSize: 16,
-    color: "#059669",
-    fontWeight: "bold",
+    color: '#059669',
+    fontWeight: 'bold',
     marginBottom: 4,
   },
   userInfoSubtext: {
     fontSize: 12,
-    color: "#6b7280",
+    color: '#6b7280',
   },
-  submitButton: {
-    backgroundColor: "#059669",
-    padding: 16,
-    borderRadius: 14,
-    alignItems: "center",
+  actionsContainer: {
     flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  cancelButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 10,
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#6b7280',
+  },
+  submitButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#059669',
+    paddingVertical: 16,
+    borderRadius: 14,
     shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowRadius: 8,
+    elevation: 6,
   },
   submitButtonDisabled: {
-    backgroundColor: "#9ca3af",
+    backgroundColor: '#9ca3af',
+    shadowOpacity: 0.1,
   },
   submitButtonText: {
-    color: "#fff",
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    letterSpacing: 0.3,
+  },
+  
+  // ESTILOS DEL MODAL DE ERROR PERSONALIZADO
+  errorModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  errorModalIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  errorModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  errorModalMessage: {
+    fontSize: 15,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  errorModalButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  errorModalButtonText: {
+    color: '#fff',
     fontSize: 17,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     letterSpacing: 0.5,
   },
-  // Estilos del Modal
+  
+  // ESTILOS DEL MODAL DE CONFIRMACIÓN PERSONALIZADO
+  confirmModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  confirmModalIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  confirmModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  confirmModalMessage: {
+    fontSize: 15,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  confirmModalButtons: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+  },
+  confirmModalCancelButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  confirmModalCancelText: {
+    color: '#6b7280',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  confirmModalConfirmButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  confirmModalConfirmText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  
+  // ESTILOS DEL MODAL DE ÉXITO PERSONALIZADO
+  successModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  successModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  successModalIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  successModalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  successModalMessage: {
+    fontSize: 15,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 28,
+  },
+  successModalButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  successModalButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  
+  // ESTILOS DEL MODAL DE CATEGORÍAS
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -941,20 +1614,17 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 20,
-    paddingBottom: 40,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 24,
     maxHeight: height * 0.7,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: 24,
+    marginBottom: 20,
   },
   modalTitle: {
     fontSize: 20,
@@ -962,36 +1632,40 @@ const styles = StyleSheet.create({
     color: '#065f46',
   },
   modalCloseButton: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  categoryList: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
+  categoriesContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
   },
-  categoryItem: {
+  categoryOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
     backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    marginBottom: 10,
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 12,
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  categoryItemSelected: {
+  categoryOptionSelected: {
     backgroundColor: '#d1fae5',
     borderColor: '#059669',
   },
-  categoryItemText: {
+  categoryOptionText: {
     fontSize: 16,
+    fontWeight: '600',
     color: '#1f2937',
-    fontWeight: '500',
     flex: 1,
   },
-  categoryItemTextSelected: {
-    color: '#059669',
+  categoryOptionTextSelected: {
+    color: '#065f46',
     fontWeight: '700',
   },
 });

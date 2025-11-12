@@ -1,153 +1,400 @@
-// src/views/RegisterScreen.js
-import React, { useState } from "react";
+/**
+ * Pantalla de Registro
+ * Con MVVM - usa useAuthViewModel
+ */
+
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Dimensions,
   Linking,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { registerUser } from "../services/api";
+  ActivityIndicator,
+  Modal,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+//  Usar el nuevo ViewModel
+import { useAuthViewModel } from '../viewmodels/Auth.viewmodel';
 
 const { width, height } = Dimensions.get('window');
 
 export default function RegisterScreen({ navigation }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  // Estados locales del formulario
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [focusedInput, setFocusedInput] = useState(null);
-  const [errors, setErrors] = useState({});
-  const [acceptedTerms, setAcceptedTerms] = useState(false); // 🆕 Estado para términos
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  const validateFields = () => {
-    const newErrors = {};
-    let isValid = true;
+  // Estado para modal de error personalizado
+  const [errorModal, setErrorModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'alert-circle',
+    iconColor: '#ef4444',
+  });
 
-    // 🔹 Validar nombre completo (solo letras y MÍNIMO 30 caracteres)
-    if (!name.trim()) {
-      newErrors.name = "El nombre completo es obligatorio.";
-      isValid = false;
-    } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(name)) {
-      newErrors.name = "El nombre solo puede contener letras.";
-      isValid = false;
-    }
+  // Estado para modal de éxito
+  const [successModal, setSuccessModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'checkmark-circle',
+    iconColor: '#10b981',
+    onClose: () => {},
+  });
 
-    // 🔹 Validar correo electrónico
-    if (!email.trim()) {
-      newErrors.email = "El correo es obligatorio.";
-      isValid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = "Correo electrónico no válido.";
-      isValid = false;
-    }
+  // Ref para el timer de auto-navegación
+  const navigationTimerRef = useRef(null);
 
-    // 🔹 Validar teléfono (exactamente 10 dígitos)
-    if (!phoneNumber.trim()) {
-      newErrors.phoneNumber = "El teléfono es obligatorio.";
-      isValid = false;
-    } else if (!/^\d{10}$/.test(phoneNumber)) {
-      newErrors.phoneNumber = "El teléfono debe tener exactamente 10 dígitos.";
-      isValid = false;
-    }
+  //  Usar el ViewModel
+  const { register, isLoading, validateField } = useAuthViewModel();
 
-    // 🔹 Validar contraseña (mínimo 8 caracteres, al menos una mayúscula)
-    if (!password.trim()) {
-      newErrors.password = "La contraseña es obligatoria.";
-      isValid = false;
-    } else if (password.length < 8) {
-      newErrors.password = "Debe tener al menos 8 caracteres.";
-      isValid = false;
-    } else if (!/[A-Z]/.test(password)) {
-      newErrors.password = "Debe incluir al menos una letra mayúscula.";
-      isValid = false;
-    }
-
-    // 🆕 Validar términos y condiciones
-    if (!acceptedTerms) {
-      newErrors.terms = "Debes aceptar los términos y condiciones.";
-      isValid = false;
-    }
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
-  const handleRegister = async () => {
-    if (!validateFields()) return;
-
-    const newUser = {
-      email,
-      name,
-      phoneNumber,
-      password,
-      role: "USER",
-    };
-
-    try {
-      const result = await registerUser(newUser);
-      if (result.isSuccess) {
-        Alert.alert("Éxito", "Cuenta creada correctamente.");
-        navigation.replace("Login");
-      } else {
-        Alert.alert("Error", result.message || "No se pudo crear la cuenta.");
+  // Limpiar timer al desmontar el componente
+  useEffect(() => {
+    return () => {
+      if (navigationTimerRef.current) {
+        clearTimeout(navigationTimerRef.current);
       }
-    } catch (error) {
-      Alert.alert("Error", "Hubo un problema con el registro.");
+    };
+  }, []);
+
+  /**
+   * Mostrar modal de error personalizado
+   */
+  const showError = (title, message, icon = 'alert-circle', iconColor = '#ef4444') => {
+    setErrorModal({
+      visible: true,
+      title,
+      message,
+      icon,
+      iconColor,
+    });
+  };
+
+  /**
+   * Cerrar modal de error
+   */
+  const closeErrorModal = () => {
+    setErrorModal({ ...errorModal, visible: false });
+  };
+
+  /**
+   * Mostrar modal de éxito con navegación automática
+   */
+  const showSuccess = (title, message, onClose) => {
+    setSuccessModal({
+      visible: true,
+      title,
+      message,
+      icon: 'checkmark-circle',
+      iconColor: '#10b981',
+      onClose,
+    });
+
+    // Navegar automáticamente después de 2 segundos
+    navigationTimerRef.current = setTimeout(() => {
+      setSuccessModal(prev => ({ ...prev, visible: false }));
+      onClose();
+    }, 2000);
+  };
+
+  /**
+   * Cerrar modal de éxito manualmente
+   */
+  const closeSuccessModal = () => {
+    if (navigationTimerRef.current) {
+      clearTimeout(navigationTimerRef.current);
+    }
+    setSuccessModal({ ...successModal, visible: false });
+    successModal.onClose();
+  };
+
+  /**
+   * VALIDAR EMAIL
+   */
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  /**
+   * VALIDAR TELÉFONO (10 dígitos)
+   */
+  const validatePhone = (phone) => {
+    return /^\d{10}$/.test(phone);
+  };
+
+  /**
+   * Manejar registro CON VALIDACIONES Y MODALES
+   */
+  const handleRegister = async () => {
+    // ========== VALIDAR CAMPOS VACÍOS ==========
+    if (!name || !name.trim()) {
+      showError(
+        'Campo vacío',
+        'Por favor ingresa tu nombre completo.',
+        'person-outline',
+        '#f59e0b'
+      );
+      return;
+    }
+
+    if (!email || !email.trim()) {
+      showError(
+        'Campo vacío',
+        'Por favor ingresa tu correo electrónico.',
+        'mail-outline',
+        '#f59e0b'
+      );
+      return;
+    }
+
+    if (!phoneNumber || !phoneNumber.trim()) {
+      showError(
+        'Campo vacío',
+        'Por favor ingresa tu número de teléfono.',
+        'call-outline',
+        '#f59e0b'
+      );
+      return;
+    }
+
+    if (!password || !password.trim()) {
+      showError(
+        'Campo vacío',
+        'Por favor ingresa una contraseña.',
+        'lock-closed-outline',
+        '#f59e0b'
+      );
+      return;
+    }
+
+    // ========== VALIDAR NOMBRE (mínimo 3 caracteres) ==========
+    if (name.trim().length < 3) {
+      showError(
+        'Nombre muy corto',
+        'El nombre debe tener al menos 3 caracteres.',
+        'person-outline',
+        '#f59e0b'
+      );
+      return;
+    }
+
+    // ========== VALIDAR FORMATO DE EMAIL ==========
+    if (!validateEmail(email.trim())) {
+      showError(
+        'Correo inválido',
+        'Por favor ingresa un correo electrónico válido.\n\nEjemplo: usuario@ejemplo.com',
+        'mail-outline',
+        '#f59e0b'
+      );
+      return;
+    }
+
+    // ========== VALIDAR TELÉFONO (10 dígitos) ==========
+    if (!validatePhone(phoneNumber.trim())) {
+      showError(
+        'Teléfono inválido',
+        'El número de teléfono debe tener exactamente 10 dígitos.',
+        'call-outline',
+        '#f59e0b'
+      );
+      return;
+    }
+
+    // ========== VALIDAR CONTRASEÑA (mínimo 8 caracteres) ==========
+    if (password.length < 8) {
+      showError(
+        'Contraseña muy corta',
+        'La contraseña debe tener al menos 8 caracteres.',
+        'lock-closed-outline',
+        '#f59e0b'
+      );
+      return;
+    }
+
+    // ========== VALIDAR MAYÚSCULA EN CONTRASEÑA ==========
+    if (!/[A-Z]/.test(password)) {
+      showError(
+        'Contraseña débil',
+        'La contraseña debe contener al menos una letra mayúscula.',
+        'lock-closed-outline',
+        '#f59e0b'
+      );
+      return;
+    }
+
+    // ========== VALIDAR TÉRMINOS Y CONDICIONES ==========
+    if (!acceptedTerms) {
+      showError(
+        'Términos y condiciones',
+        'Debes aceptar los términos y condiciones para continuar.',
+        'document-text-outline',
+        '#f59e0b'
+      );
+      return;
+    }
+
+    //  Llamar al ViewModel
+    const result = await register({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phoneNumber: phoneNumber.trim(),
+      password,
+    });
+
+    if (result.success) {
+      // Mostrar modal de éxito con navegación automática
+      showSuccess(
+        '¡Cuenta creada! 🎉',
+        result.message || 'Tu cuenta ha sido creada exitosamente.\n\nRedirigiendo al inicio de sesión...',
+        () => {
+          navigation.replace('Login');
+        }
+      );
+    } else {
+      // Manejar diferentes tipos de errores
+      const errorMsg = (result.error || '').toLowerCase();
+      
+      // Error de correo ya registrado
+      if (errorMsg.includes('correo ya está registrado') || 
+          errorMsg.includes('email ya existe') ||
+          errorMsg.includes('already exists') ||
+          errorMsg.includes('ya registrado')) {
+        showError(
+          '📧 Correo en uso',
+          'Este correo electrónico ya está registrado.\n\n¿Ya tienes una cuenta? Intenta iniciar sesión.',
+          'mail-outline',
+          '#ef4444'
+        );
+      }
+      // Error de datos inválidos
+      else if (errorMsg.includes('datos inválidos') || 
+               errorMsg.includes('invalid data') ||
+               errorMsg.includes('validation')) {
+        showError(
+          '⚠️ Datos inválidos',
+          'Por favor verifica que todos los campos estén correctos.',
+          'alert-circle',
+          '#f59e0b'
+        );
+      }
+      // Error de conexión
+      else if (errorMsg.includes('network') || 
+               errorMsg.includes('conexión') ||
+               errorMsg.includes('connection') ||
+               errorMsg.includes('sin conexión')) {
+        showError(
+          '📡 Sin conexión',
+          'No se pudo conectar al servidor.\n\nVerifica tu conexión a internet e intenta de nuevo.',
+          'cloud-offline-outline',
+          '#f59e0b'
+        );
+      }
+      // Error de timeout
+      else if (errorMsg.includes('timeout') || 
+               errorMsg.includes('tiempo de espera')) {
+        showError(
+          '⏱️ Tiempo agotado',
+          'La conexión tardó demasiado.\n\nPor favor intenta de nuevo.',
+          'time-outline',
+          '#f59e0b'
+        );
+      }
+      // Error del servidor
+      else if (errorMsg.includes('servidor') || 
+               errorMsg.includes('server error')) {
+        showError(
+          '🔧 Error del servidor',
+          'Hay un problema en el servidor.\n\nPor favor intenta más tarde.',
+          'construct-outline',
+          '#ef4444'
+        );
+      }
+      // Error genérico
+      else {
+        showError(
+          '❌ Error al crear cuenta',
+          result.error || 'No se pudo crear la cuenta.\n\nPor favor intenta de nuevo más tarde.',
+          'alert-circle',
+          '#ef4444'
+        );
+      }
     }
   };
 
-  // 🆕 Función para abrir términos y condiciones
+  /**
+   * Abrir términos y condiciones
+   */
   const openTerms = async () => {
-    const url = "https://gutsayn.github.io/ufood-legal/legal/terms.html";
+    const url = 'https://gutsayn.github.io/ufood-legal/legal/terms.html';
     try {
       const supported = await Linking.canOpenURL(url);
       if (supported) {
         await Linking.openURL(url);
       } else {
-        Alert.alert("Error", "No se puede abrir el enlace");
+        showError(
+          'Error',
+          'No se puede abrir el enlace en este momento.',
+          'link-outline',
+          '#ef4444'
+        );
       }
     } catch (error) {
-      Alert.alert("Error", "Ocurrió un problema al abrir los términos");
+      showError(
+        'Error',
+        'Ocurrió un problema al abrir los términos y condiciones.',
+        'link-outline',
+        '#ef4444'
+      );
     }
   };
 
-  // Validación visual en tiempo real para mostrar checkmarks
+  /**
+   * Validación visual en tiempo real
+   */
   const getFieldStatus = (field) => {
     if (field === 'name' && name.length > 0) {
-      return name.trim().length < 40 && /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(name);
+      const validation = validateField('name', name);
+      return validation.isValid;
     }
     if (field === 'email' && email.length > 0) {
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const validation = validateField('email', email);
+      return validation.isValid;
     }
     if (field === 'phone' && phoneNumber.length > 0) {
-      return /^\d{10}$/.test(phoneNumber);
+      const validation = validateField('phoneNumber', phoneNumber);
+      return validation.isValid;
     }
     if (field === 'password' && password.length > 0) {
-      return password.length >= 8 && /[A-Z]/.test(password);
+      const validation = validateField('password', password);
+      return validation.isValid;
     }
     return null;
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Fondo decorativo con círculos animados */}
+        {/* Fondo decorativo */}
         <View style={styles.topBackground}>
           <View style={styles.circle1} />
           <View style={styles.circle2} />
@@ -156,9 +403,10 @@ export default function RegisterScreen({ navigation }) {
 
         {/* Header con botón de regreso */}
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.navigate("Login")}
+            onPress={() => navigation.navigate('Login')}
+            disabled={isLoading}
           >
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
@@ -182,18 +430,19 @@ export default function RegisterScreen({ navigation }) {
             <Text style={styles.registerText}>Completa tus datos para comenzar</Text>
           </View>
 
-          {/* Input de nombre completo con validación de 30 caracteres */}
+          {/* Input de nombre completo */}
           <View style={styles.inputContainer}>
-            <View style={[
-              styles.inputWrapper,
-              focusedInput === 'name' && styles.inputWrapperFocused,
-              errors.name && styles.inputWrapperError
-            ]}>
+            <View
+              style={[
+                styles.inputWrapper,
+                focusedInput === 'name' && styles.inputWrapperFocused,
+              ]}
+            >
               <View style={styles.iconContainer}>
-                <Ionicons 
-                  name="person-outline" 
-                  size={22} 
-                  color={focusedInput === 'name' ? '#059669' : '#6b7280'} 
+                <Ionicons
+                  name="person-outline"
+                  size={22}
+                  color={focusedInput === 'name' ? '#059669' : '#6b7280'}
                 />
               </View>
               <TextInput
@@ -205,41 +454,47 @@ export default function RegisterScreen({ navigation }) {
                 maxLength={40}
                 onFocus={() => setFocusedInput('name')}
                 onBlur={() => setFocusedInput(null)}
+                editable={!isLoading}
               />
               {getFieldStatus('name') !== null && (
                 <View style={styles.statusIcon}>
-                  <Ionicons 
-                    name={getFieldStatus('name') ? "checkmark-circle" : "alert-circle"} 
-                    size={20} 
-                    color={getFieldStatus('name') ? '#10b981' : '#f59e0b'} 
+                  <Ionicons
+                    name={getFieldStatus('name') ? 'checkmark-circle' : 'alert-circle'}
+                    size={20}
+                    color={getFieldStatus('name') ? '#10b981' : '#f59e0b'}
                   />
                 </View>
               )}
             </View>
-            {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-            {/* Contador de caracteres en tiempo real */}
+            {/* Contador de caracteres */}
             {name.length > 0 && (
-              <Text style={[
-                styles.charCounter,
-                name.trim().length <= 30 ? styles.charCounterSuccess : styles.charCounterWarning
-              ]}>
-                {name.trim().length}/30 caracteres {name.trim().length >= 30 ? '✓' : ''}
+              <Text
+                style={[
+                  styles.charCounter,
+                  name.trim().length >= 30
+                    ? styles.charCounterSuccess
+                    : styles.charCounterWarning,
+                ]}
+              >
+                {name.trim().length}/30 caracteres{' '}
+                {name.trim().length >= 30 ? '✓' : ''}
               </Text>
             )}
           </View>
 
           {/* Input de correo */}
           <View style={styles.inputContainer}>
-            <View style={[
-              styles.inputWrapper,
-              focusedInput === 'email' && styles.inputWrapperFocused,
-              errors.email && styles.inputWrapperError
-            ]}>
+            <View
+              style={[
+                styles.inputWrapper,
+                focusedInput === 'email' && styles.inputWrapperFocused,
+              ]}
+            >
               <View style={styles.iconContainer}>
-                <Ionicons 
-                  name="mail-outline" 
-                  size={22} 
-                  color={focusedInput === 'email' ? '#059669' : '#6b7280'} 
+                <Ionicons
+                  name="mail-outline"
+                  size={22}
+                  color={focusedInput === 'email' ? '#059669' : '#6b7280'}
                 />
               </View>
               <TextInput
@@ -252,32 +507,33 @@ export default function RegisterScreen({ navigation }) {
                 keyboardType="email-address"
                 onFocus={() => setFocusedInput('email')}
                 onBlur={() => setFocusedInput(null)}
+                editable={!isLoading}
               />
               {getFieldStatus('email') !== null && (
                 <View style={styles.statusIcon}>
-                  <Ionicons 
-                    name={getFieldStatus('email') ? "checkmark-circle" : "alert-circle"} 
-                    size={20} 
-                    color={getFieldStatus('email') ? '#10b981' : '#f59e0b'} 
+                  <Ionicons
+                    name={getFieldStatus('email') ? 'checkmark-circle' : 'alert-circle'}
+                    size={20}
+                    color={getFieldStatus('email') ? '#10b981' : '#f59e0b'}
                   />
                 </View>
               )}
             </View>
-            {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
           </View>
 
           {/* Input de teléfono */}
           <View style={styles.inputContainer}>
-            <View style={[
-              styles.inputWrapper,
-              focusedInput === 'phone' && styles.inputWrapperFocused,
-              errors.phoneNumber && styles.inputWrapperError
-            ]}>
+            <View
+              style={[
+                styles.inputWrapper,
+                focusedInput === 'phone' && styles.inputWrapperFocused,
+              ]}
+            >
               <View style={styles.iconContainer}>
-                <Ionicons 
-                  name="call-outline" 
-                  size={22} 
-                  color={focusedInput === 'phone' ? '#059669' : '#6b7280'} 
+                <Ionicons
+                  name="call-outline"
+                  size={22}
+                  color={focusedInput === 'phone' ? '#059669' : '#6b7280'}
                 />
               </View>
               <TextInput
@@ -290,32 +546,33 @@ export default function RegisterScreen({ navigation }) {
                 maxLength={10}
                 onFocus={() => setFocusedInput('phone')}
                 onBlur={() => setFocusedInput(null)}
+                editable={!isLoading}
               />
               {getFieldStatus('phone') !== null && (
                 <View style={styles.statusIcon}>
-                  <Ionicons 
-                    name={getFieldStatus('phone') ? "checkmark-circle" : "alert-circle"} 
-                    size={20} 
-                    color={getFieldStatus('phone') ? '#10b981' : '#f59e0b'} 
+                  <Ionicons
+                    name={getFieldStatus('phone') ? 'checkmark-circle' : 'alert-circle'}
+                    size={20}
+                    color={getFieldStatus('phone') ? '#10b981' : '#f59e0b'}
                   />
                 </View>
               )}
             </View>
-            {errors.phoneNumber && <Text style={styles.errorText}>{errors.phoneNumber}</Text>}
           </View>
 
           {/* Input de contraseña */}
           <View style={styles.inputContainer}>
-            <View style={[
-              styles.inputWrapper,
-              focusedInput === 'password' && styles.inputWrapperFocused,
-              errors.password && styles.inputWrapperError
-            ]}>
+            <View
+              style={[
+                styles.inputWrapper,
+                focusedInput === 'password' && styles.inputWrapperFocused,
+              ]}
+            >
               <View style={styles.iconContainer}>
-                <Ionicons 
-                  name="lock-closed-outline" 
-                  size={22} 
-                  color={focusedInput === 'password' ? '#059669' : '#6b7280'} 
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={22}
+                  color={focusedInput === 'password' ? '#059669' : '#6b7280'}
                 />
               </View>
               <TextInput
@@ -327,95 +584,117 @@ export default function RegisterScreen({ navigation }) {
                 onChangeText={setPassword}
                 onFocus={() => setFocusedInput('password')}
                 onBlur={() => setFocusedInput(null)}
+                editable={!isLoading}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeButton}
+                disabled={isLoading}
               >
-                <Ionicons 
-                  name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                  size={22} 
-                  color="#6b7280" 
+                <Ionicons
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={22}
+                  color="#6b7280"
                 />
               </TouchableOpacity>
               {getFieldStatus('password') !== null && (
                 <View style={styles.statusIcon}>
-                  <Ionicons 
-                    name={getFieldStatus('password') ? "checkmark-circle" : "alert-circle"} 
-                    size={20} 
-                    color={getFieldStatus('password') ? '#10b981' : '#f59e0b'} 
+                  <Ionicons
+                    name={
+                      getFieldStatus('password') ? 'checkmark-circle' : 'alert-circle'
+                    }
+                    size={20}
+                    color={getFieldStatus('password') ? '#10b981' : '#f59e0b'}
                   />
                 </View>
               )}
             </View>
-            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
           </View>
 
           {/* Indicadores de requisitos de contraseña */}
           <View style={styles.passwordRequirements}>
             <View style={styles.requirementItem}>
-              <Text style={[
-                styles.requirementDot,
-                password.length >= 8 && styles.requirementDotActive
-              ]}>●</Text>
-              <Text style={[
-                styles.requirementText,
-                password.length >= 8 && styles.requirementTextActive
-              ]}>Mínimo 8 caracteres</Text>
+              <Text
+                style={[
+                  styles.requirementDot,
+                  password.length >= 8 && styles.requirementDotActive,
+                ]}
+              >
+                ●
+              </Text>
+              <Text
+                style={[
+                  styles.requirementText,
+                  password.length >= 8 && styles.requirementTextActive,
+                ]}
+              >
+                Mínimo 8 caracteres
+              </Text>
             </View>
             <View style={styles.requirementItem}>
-              <Text style={[
-                styles.requirementDot,
-                /[A-Z]/.test(password) && styles.requirementDotActive
-              ]}>●</Text>
-              <Text style={[
-                styles.requirementText,
-                /[A-Z]/.test(password) && styles.requirementTextActive
-              ]}>Una letra mayúscula</Text>
+              <Text
+                style={[
+                  styles.requirementDot,
+                  /[A-Z]/.test(password) && styles.requirementDotActive,
+                ]}
+              >
+                ●
+              </Text>
+              <Text
+                style={[
+                  styles.requirementText,
+                  /[A-Z]/.test(password) && styles.requirementTextActive,
+                ]}
+              >
+                Una letra mayúscula
+              </Text>
             </View>
           </View>
 
-          {/* 🆕 Checkbox de Términos y Condiciones */}
+          {/* Checkbox de Términos y Condiciones */}
           <View style={styles.termsContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.checkbox,
                 acceptedTerms && styles.checkboxChecked,
-                errors.terms && styles.checkboxError
               ]}
               onPress={() => setAcceptedTerms(!acceptedTerms)}
               activeOpacity={0.7}
+              disabled={isLoading}
             >
-              {acceptedTerms && (
-                <Ionicons name="checkmark" size={18} color="white" />
-              )}
+              {acceptedTerms && <Ionicons name="checkmark" size={18} color="white" />}
             </TouchableOpacity>
             <View style={styles.termsTextContainer}>
               <Text style={styles.termsText}>
                 Acepto los{' '}
-                <Text 
-                  style={styles.termsLink}
-                  onPress={openTerms}
-                >
+                <Text style={styles.termsLink} onPress={openTerms}>
                   Términos y Condiciones
                 </Text>
               </Text>
             </View>
           </View>
-          {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
 
           {/* Botón de registro */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.registerButton,
-              !acceptedTerms && styles.registerButtonDisabled
-            ]} 
+              (!acceptedTerms || isLoading) && styles.registerButtonDisabled,
+            ]}
             onPress={handleRegister}
             activeOpacity={0.8}
-            disabled={!acceptedTerms}
+            disabled={!acceptedTerms || isLoading}
           >
-            <Text style={styles.registerButtonText}>Crear Cuenta</Text>
-            <Ionicons name="arrow-forward" size={20} color="white" />
+            {isLoading ? (
+              <>
+                <ActivityIndicator color="#fff" size="small" />
+                <Text style={styles.registerButtonText}> Creando...</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.registerButtonText}>Crear Cuenta</Text>
+                <Ionicons name="arrow-forward" size={20} color="white" />
+              </>
+            )}
           </TouchableOpacity>
 
           {/* Separador */}
@@ -424,10 +703,14 @@ export default function RegisterScreen({ navigation }) {
             <Text style={styles.dividerText}>o</Text>
             <View style={styles.dividerLine} />
           </View>
+
           {/* Link a login */}
           <View style={styles.loginContainer}>
             <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Login')}
+              disabled={isLoading}
+            >
               <Text style={styles.loginLink}>Inicia sesión</Text>
             </TouchableOpacity>
           </View>
@@ -436,10 +719,58 @@ export default function RegisterScreen({ navigation }) {
         {/* Decoración inferior */}
         <View style={styles.bottomDecoration}>
           <Ionicons name="leaf" size={20} color="#d1fae5" />
-          <Text style={styles.bottomText}>Únete a la familia UNIFOOD</Text>
+          <Text style={styles.bottomText}>Únete a la familia UFood</Text>
           <Ionicons name="leaf" size={20} color="#d1fae5" />
         </View>
       </ScrollView>
+
+      {/* MODAL DE ERROR PERSONALIZADO */}
+      <Modal
+        visible={errorModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeErrorModal}
+      >
+        <View style={styles.errorModalOverlay}>
+          <View style={styles.errorModalContent}>
+            <View style={[styles.errorModalIcon, { backgroundColor: `${errorModal.iconColor}15` }]}>
+              <Ionicons name={errorModal.icon} size={48} color={errorModal.iconColor} />
+            </View>
+            
+            <Text style={styles.errorModalTitle}>{errorModal.title}</Text>
+            <Text style={styles.errorModalMessage}>{errorModal.message}</Text>
+            
+            <TouchableOpacity
+              style={[styles.errorModalButton, { backgroundColor: errorModal.iconColor }]}
+              onPress={closeErrorModal}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.errorModalButtonText}>Entendido</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL DE ÉXITO PERSONALIZADO */}
+      <Modal
+        visible={successModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeSuccessModal}
+      >
+        <View style={styles.successModalOverlay}>
+          <View style={styles.successModalContent}>
+            <View style={[styles.successModalIcon, { backgroundColor: `${successModal.iconColor}15` }]}>
+              <Ionicons name={successModal.icon} size={64} color={successModal.iconColor} />
+            </View>
+            
+            <Text style={styles.successModalTitle}>{successModal.title}</Text>
+            <Text style={styles.successModalMessage}>{successModal.message}</Text>
+            
+            <ActivityIndicator size="large" color={successModal.iconColor} style={styles.successLoader} />
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -581,10 +912,6 @@ const styles = StyleSheet.create({
     borderColor: '#059669',
     backgroundColor: '#f0fdf4',
   },
-  inputWrapperError: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
   iconContainer: {
     width: 44,
     height: 50,
@@ -609,13 +936,6 @@ const styles = StyleSheet.create({
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 12,
-    marginTop: 6,
-    marginLeft: 4,
-    fontWeight: '500',
   },
   charCounter: {
     fontSize: 12,
@@ -656,7 +976,6 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontWeight: '600',
   },
-  // 🆕 Estilos para Términos y Condiciones
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -678,9 +997,6 @@ const styles = StyleSheet.create({
   checkboxChecked: {
     backgroundColor: '#059669',
     borderColor: '#059669',
-  },
-  checkboxError: {
-    borderColor: '#ef4444',
   },
   termsTextContainer: {
     flex: 1,
@@ -737,22 +1053,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  socialContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 20,
-  },
-  socialButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#f9fafb',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-  },
   loginContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -780,5 +1080,113 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontSize: 13,
     fontWeight: '600',
+  },
+
+  // ESTILOS DEL MODAL DE ERROR PERSONALIZADO
+  errorModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  errorModalIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  errorModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  errorModalMessage: {
+    fontSize: 15,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  errorModalButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  errorModalButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+
+  // ESTILOS DEL MODAL DE ÉXITO
+  successModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  successModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  successModalIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  successModalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  successModalMessage: {
+    fontSize: 15,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  successLoader: {
+    marginTop: 8,
   },
 });
