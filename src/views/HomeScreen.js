@@ -27,8 +27,8 @@ import { useProductViewModel } from '../viewmodels/Product.viewmodel';
 
 const { width } = Dimensions.get('window');
 
-// INTERVALO DE ACTUALIZACIÓN AUTOMÁTICA (10 segundos para likes)
-const AUTO_REFRESH_INTERVAL = 10000;
+// INTERVALO DE ACTUALIZACIÓN AUTOMÁTICA (15 segundos para likes)
+const AUTO_REFRESH_INTERVAL = 15000;
 
 export default function HomeScreen({ navigation }) {
   // Estados locales para UI
@@ -353,13 +353,13 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
-  // LOADING 
+  // LOADING
   if (isLoading && products.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <View style={styles.loadingCard}>
           <ActivityIndicator size="large" color="#059669" />
-          <Text style={styles.loadingText}>Cargando productos...</Text>
+          <Text style={styles.loadingText}>Cargando información...</Text>
         </View>
       </View>
     );

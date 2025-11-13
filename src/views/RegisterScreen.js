@@ -1,6 +1,7 @@
 /**
  * Pantalla de Registro
  * Con MVVM - usa useAuthViewModel
+ * ✅ CON MODALES PERSONALIZADOS
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -102,7 +103,7 @@ export default function RegisterScreen({ navigation }) {
       onClose,
     });
 
-    // Navegar automáticamente después de 2 segundos
+    // ✅ Navegar automáticamente después de 2 segundos
     navigationTimerRef.current = setTimeout(() => {
       setSuccessModal(prev => ({ ...prev, visible: false }));
       onClose();
@@ -139,7 +140,7 @@ export default function RegisterScreen({ navigation }) {
    * Manejar registro CON VALIDACIONES Y MODALES
    */
   const handleRegister = async () => {
-    // ========== VALIDAR CAMPOS VACÍOS ==========
+    // VALIDAR CAMPOS VACÍOS
     if (!name || !name.trim()) {
       showError(
         'Campo vacío',
@@ -180,7 +181,7 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    // ========== VALIDAR NOMBRE (mínimo 3 caracteres) ==========
+    // VALIDAR NOMBRE (mínimo 3 caracteres)
     if (name.trim().length < 3) {
       showError(
         'Nombre muy corto',
@@ -191,7 +192,7 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    // ========== VALIDAR FORMATO DE EMAIL ==========
+    // VALIDAR FORMATO DE EMAIL
     if (!validateEmail(email.trim())) {
       showError(
         'Correo inválido',
@@ -202,7 +203,7 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    // ========== VALIDAR TELÉFONO (10 dígitos) ==========
+    // VALIDAR TELÉFONO (10 dígitos)
     if (!validatePhone(phoneNumber.trim())) {
       showError(
         'Teléfono inválido',
@@ -213,7 +214,7 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    // ========== VALIDAR CONTRASEÑA (mínimo 8 caracteres) ==========
+    // VALIDAR CONTRASEÑA (mínimo 8 caracteres)
     if (password.length < 8) {
       showError(
         'Contraseña muy corta',
@@ -224,7 +225,7 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    // ========== VALIDAR MAYÚSCULA EN CONTRASEÑA ==========
+    // VALIDAR MAYÚSCULA EN CONTRASEÑA
     if (!/[A-Z]/.test(password)) {
       showError(
         'Contraseña débil',
@@ -235,7 +236,7 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    // ========== VALIDAR TÉRMINOS Y CONDICIONES ==========
+    // VALIDAR TÉRMINOS Y CONDICIONES
     if (!acceptedTerms) {
       showError(
         'Términos y condiciones',
@@ -257,7 +258,7 @@ export default function RegisterScreen({ navigation }) {
     if (result.success) {
       // Mostrar modal de éxito con navegación automática
       showSuccess(
-        '¡Cuenta creada! 🎉',
+        'Cuenta creada',
         result.message || 'Tu cuenta ha sido creada exitosamente.\n\nRedirigiendo al inicio de sesión...',
         () => {
           navigation.replace('Login');
@@ -273,7 +274,7 @@ export default function RegisterScreen({ navigation }) {
           errorMsg.includes('already exists') ||
           errorMsg.includes('ya registrado')) {
         showError(
-          '📧 Correo en uso',
+          'Correo en uso',
           'Este correo electrónico ya está registrado.\n\n¿Ya tienes una cuenta? Intenta iniciar sesión.',
           'mail-outline',
           '#ef4444'
@@ -284,7 +285,7 @@ export default function RegisterScreen({ navigation }) {
                errorMsg.includes('invalid data') ||
                errorMsg.includes('validation')) {
         showError(
-          '⚠️ Datos inválidos',
+          'Datos inválidos',
           'Por favor verifica que todos los campos estén correctos.',
           'alert-circle',
           '#f59e0b'
@@ -296,7 +297,7 @@ export default function RegisterScreen({ navigation }) {
                errorMsg.includes('connection') ||
                errorMsg.includes('sin conexión')) {
         showError(
-          '📡 Sin conexión',
+          'Sin conexión',
           'No se pudo conectar al servidor.\n\nVerifica tu conexión a internet e intenta de nuevo.',
           'cloud-offline-outline',
           '#f59e0b'
@@ -306,7 +307,7 @@ export default function RegisterScreen({ navigation }) {
       else if (errorMsg.includes('timeout') || 
                errorMsg.includes('tiempo de espera')) {
         showError(
-          '⏱️ Tiempo agotado',
+          'Tiempo agotado',
           'La conexión tardó demasiado.\n\nPor favor intenta de nuevo.',
           'time-outline',
           '#f59e0b'
@@ -316,7 +317,7 @@ export default function RegisterScreen({ navigation }) {
       else if (errorMsg.includes('servidor') || 
                errorMsg.includes('server error')) {
         showError(
-          '🔧 Error del servidor',
+          'Error del servidor',
           'Hay un problema en el servidor.\n\nPor favor intenta más tarde.',
           'construct-outline',
           '#ef4444'
@@ -325,7 +326,7 @@ export default function RegisterScreen({ navigation }) {
       // Error genérico
       else {
         showError(
-          '❌ Error al crear cuenta',
+          'Error al crear cuenta',
           result.error || 'No se pudo crear la cuenta.\n\nPor favor intenta de nuevo más tarde.',
           'alert-circle',
           '#ef4444'
@@ -426,7 +427,7 @@ export default function RegisterScreen({ navigation }) {
         {/* Tarjeta de registro */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.welcomeText}>¡Únete! 🎉</Text>
+            <Text style={styles.welcomeText}>¡Únete!</Text>
             <Text style={styles.registerText}>Completa tus datos para comenzar</Text>
           </View>
 
@@ -477,7 +478,7 @@ export default function RegisterScreen({ navigation }) {
                 ]}
               >
                 {name.trim().length}/30 caracteres{' '}
-                {name.trim().length >= 30 ? '✓' : ''}
+                {name.trim().length >= 30 ? 'OK' : ''}
               </Text>
             )}
           </View>
@@ -724,7 +725,7 @@ export default function RegisterScreen({ navigation }) {
         </View>
       </ScrollView>
 
-      {/* MODAL DE ERROR PERSONALIZADO */}
+      {/* ✅ MODAL DE ERROR PERSONALIZADO */}
       <Modal
         visible={errorModal.visible}
         transparent={true}
@@ -751,7 +752,7 @@ export default function RegisterScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* MODAL DE ÉXITO PERSONALIZADO */}
+      {/* ✅ MODAL DE ÉXITO PERSONALIZADO */}
       <Modal
         visible={successModal.visible}
         transparent={true}
@@ -879,6 +880,7 @@ const styles = StyleSheet.create({
     shadowColor: '#059669',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
+    textAlign: 'center', 
     shadowRadius: 16,
     elevation: 8,
   },
@@ -889,11 +891,13 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: 'bold',
     color: '#065f46',
+    textAlign: 'center', 
     marginBottom: 6,
   },
   registerText: {
     fontSize: 14,
     color: '#6b7280',
+    textAlign: 'center',
     fontWeight: '500',
   },
   inputContainer: {
@@ -1082,7 +1086,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // ESTILOS DEL MODAL DE ERROR PERSONALIZADO
+  // ✅ ESTILOS DEL MODAL DE ERROR PERSONALIZADO
   errorModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -1143,7 +1147,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // ESTILOS DEL MODAL DE ÉXITO
+  // ✅ ESTILOS DEL MODAL DE ÉXITO
   successModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',

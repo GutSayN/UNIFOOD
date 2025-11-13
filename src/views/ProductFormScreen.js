@@ -50,6 +50,8 @@ export default function ProductFormScreen({ navigation, route }) {
     image: null,
   });
 
+  const [originalFormData, setOriginalFormData] = useState(null);
+  const [hasChanges, setHasChanges] = useState(false);
   const [focusedInput, setFocusedInput] = useState(null);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   
@@ -88,15 +90,41 @@ export default function ProductFormScreen({ navigation, route }) {
   // Cargar datos del producto en modo edición
   useEffect(() => {
     if (isEditMode && product) {
-      setFormData({
+      const initialData = {
         name: product.name || '',
         price: product.price?.toString() || '',
         description: product.description || '',
         categoryName: product.categoryName || CONFIG.CATEGORIES[0],
         image: product.imageUrl ? { uri: product.imageUrl } : null,
-      });
+      };
+      setFormData(initialData);
+      setOriginalFormData(initialData);
     }
   }, [isEditMode, product]);
+
+  // Detectar cambios en el formulario
+  useEffect(() => {
+    if (!isEditMode || !originalFormData) {
+      setHasChanges(true);
+      return;
+    }
+
+    // Comparar cada campo
+    const nameChanged = formData.name !== originalFormData.name;
+    const priceChanged = formData.price !== originalFormData.price;
+    const descriptionChanged = formData.description !== originalFormData.description;
+    const categoryChanged = formData.categoryName !== originalFormData.categoryName;
+    
+    // Comparar imagen (null vs null, uri vs uri)
+    const imageChanged = (() => {
+      const currentUri = formData.image?.uri || null;
+      const originalUri = originalFormData.image?.uri || null;
+      return currentUri !== originalUri;
+    })();
+
+    const hasAnyChange = nameChanged || priceChanged || descriptionChanged || categoryChanged || imageChanged;
+    setHasChanges(hasAnyChange);
+  }, [formData, originalFormData, isEditMode]);
 
   /**
    * Mostrar modal de error personalizado
@@ -335,11 +363,11 @@ export default function ProductFormScreen({ navigation, route }) {
       return false;
     }
 
-    const descRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s,\.]+$/;
+    const descRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s,\.;:]+$/;
     if (!descRegex.test(trimmedDesc)) {
       showError(
         'Descripción inválida',
-        'La descripción solo puede contener letras, números, espacios, acentos, comas y puntos.\n\nNo se permiten otros símbolos especiales.'
+        'La descripción solo puede contener letras, números, espacios, acentos, comas, puntos, punto y coma, y dos puntos.\n\nNo se permiten otros símbolos especiales.'
       );
       return false;
     }
@@ -375,7 +403,7 @@ export default function ProductFormScreen({ navigation, route }) {
 
       if (result.success) {
         showSuccess(
-          '✅ ¡Éxito!',
+          '¡Éxito!',
           isEditMode ? 'Tu producto ha sido actualizado correctamente y ya está disponible en tu catálogo.' : 'Tu producto ha sido creado correctamente y ya está visible para todos los usuarios.',
           () => {
             // Resetear la navegación: Home → ProductsList
@@ -403,7 +431,7 @@ export default function ProductFormScreen({ navigation, route }) {
               errorMsg.includes("contenido ofensivo")) {
             
             showError(
-              '🚫 Lenguaje inapropiado',
+              'Lenguaje inapropiado',
               'El texto contiene lenguaje inapropiado en el nombre, descripción o categoría.\n\nPor favor revisa y corrige el contenido.',
               'close-circle',
               '#ef4444'
@@ -417,7 +445,7 @@ export default function ProductFormScreen({ navigation, route }) {
               errorMsg.includes("inappropriate")) {
             
             showError(
-              '🚫 Imagen no permitida',
+              'Imagen no permitida',
               'La imagen que seleccionaste contiene contenido inapropiado, sensible o violento.\n\nPor favor selecciona una imagen diferente que cumpla con nuestras políticas de contenido.',
               'close-circle',
               '#ef4444'
@@ -463,7 +491,7 @@ export default function ProductFormScreen({ navigation, route }) {
             errorMsg.includes("palabras ofensivas") ||
             errorMsg.includes("contenido ofensivo")) {
           
-          errorTitle = "🚫 Lenguaje inapropiado";
+          errorTitle = "Lenguaje inapropiado";
           errorMessage = "El texto contiene lenguaje inapropiado en el nombre, descripción o categoría.\n\n" +
                         "Por favor revisa y corrige el contenido.";
           errorIcon = 'close-circle';
@@ -475,7 +503,7 @@ export default function ProductFormScreen({ navigation, route }) {
             errorMsg.includes("contenido inapropiado") ||
             errorMsg.includes("inappropriate")) {
           
-          errorTitle = "🚫 Imagen no permitida";
+          errorTitle = "Imagen no permitida";
           errorMessage = "La imagen que seleccionaste contiene contenido inapropiado, sensible o violento.\n\n" +
                         "Por favor selecciona una imagen diferente que cumpla con nuestras políticas de contenido.";
           errorIcon = 'close-circle';
@@ -502,7 +530,7 @@ export default function ProductFormScreen({ navigation, route }) {
                 if (serverMsg.includes("lenguaje inapropiado") ||
                     serverMsg.includes("malas palabras") ||
                     serverMsg.includes("palabras ofensivas")) {
-                  errorTitle = "🚫 Lenguaje inapropiado";
+                  errorTitle = "Lenguaje inapropiado";
                   errorMessage = "El texto contiene lenguaje inapropiado.\n\n" +
                                 "Por favor revisa el nombre, descripción y categoría.";
                   errorIcon = 'close-circle';
@@ -511,7 +539,7 @@ export default function ProductFormScreen({ navigation, route }) {
                 } else if (serverMsg.includes("imagen rechazada") || 
                     serverMsg.includes("contenido sensible") ||
                     serverMsg.includes("contenido inapropiado")) {
-                  errorTitle = "🚫 Imagen no permitida";
+                  errorTitle = "Imagen no permitida";
                   errorMessage = "La imagen que seleccionaste contiene contenido inapropiado.\n\n" +
                                 "Por favor selecciona una imagen diferente que cumpla con nuestras políticas.";
                   errorIcon = 'close-circle';
@@ -635,7 +663,7 @@ export default function ProductFormScreen({ navigation, route }) {
                     <Text style={styles.requiredBadgeText}>Obligatorio</Text>
                   </View>
                   <Text style={styles.imageWarning}>
-                    ⚠️ No se permiten imágenes inapropiadas
+                    No se permiten imágenes inapropiadas
                   </Text>
                 </View>
               )}
@@ -841,10 +869,13 @@ export default function ProductFormScreen({ navigation, route }) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton, 
+                (isLoading || (isEditMode && !hasChanges)) && styles.submitButtonDisabled
+              ]}
               onPress={handleSubmit}
               activeOpacity={0.8}
-              disabled={isLoading}
+              disabled={isLoading || (isEditMode && !hasChanges)}
             >
               {isLoading ? (
                 <>

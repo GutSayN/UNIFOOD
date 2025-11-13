@@ -79,7 +79,7 @@ export default function ProductsListScreen({ navigation }) {
   }, [navigation, user?.id, hasLoadedUserProducts]);
 
   /**
-   * Mostrar modal de éxito
+   * Mostrar modal de exito
    */
   const showSuccess = (title, message) => {
     setSuccessModal({ visible: true, title, message });
@@ -93,7 +93,7 @@ export default function ProductsListScreen({ navigation }) {
   };
 
   /**
-   * Mostrar modal de confirmación
+   * Mostrar modal de confirmacion
    */
   const showConfirm = (title, message, onConfirm, productName = '') => {
     setConfirmModal({ visible: true, title, message, onConfirm, productName });
@@ -123,12 +123,12 @@ export default function ProductsListScreen({ navigation }) {
    */
   const handleDelete = (productId, productName) => {
     showConfirm(
-      '¿Eliminar producto?',
-      `El producto "${productName}" será eliminado permanentemente. Esta acción no se puede deshacer.`,
+      'Eliminar producto',
+      `El producto "${productName}" sera eliminado permanentemente. Esta acción no se puede deshacer.`,
       async () => {
         const result = await deleteProduct(productId);
         if (result.success) {
-          showSuccess('¡Producto eliminado!', `"${productName}" ha sido eliminado correctamente.`);
+          showSuccess('Producto eliminado', `"${productName}" ha sido eliminado correctamente.`);
           // Recargar lista silenciosamente
           if (user?.id) {
             await loadUserProducts(user.id, true);
@@ -167,7 +167,7 @@ export default function ProductsListScreen({ navigation }) {
         </View>
       )}
 
-      {/* Información */}
+      {/* Informacion */}
       <View style={styles.productInfo}>
         <View style={styles.productHeader}>
           {item.categoryName && (
@@ -196,7 +196,7 @@ export default function ProductsListScreen({ navigation }) {
           </Text>
         )}
 
-        {/* Botones de Acción */}
+        {/* Botones de Accion */}
         <View style={styles.actionsContainer}>
           <TouchableOpacity
             style={styles.editButton}
@@ -246,12 +246,12 @@ export default function ProductsListScreen({ navigation }) {
           <Ionicons name="alert-circle-outline" size={60} color="#ef4444" />
         </View>
         <Text style={styles.errorText}>Error al cargar usuario</Text>
-        <Text style={styles.errorSubtext}>Por favor, vuelve a iniciar sesión</Text>
+        <Text style={styles.errorSubtext}>Por favor, vuelve a iniciar sesion</Text>
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => navigation.replace('Login')}
         >
-          <Text style={styles.retryButtonText}>Ir al inicio de sesión</Text>
+          <Text style={styles.retryButtonText}>Ir al inicio de sesion</Text>
         </TouchableOpacity>
       </View>
     );
@@ -314,7 +314,7 @@ export default function ProductsListScreen({ navigation }) {
         />
       )}
 
-      {/* MODAL DE ÉXITO */}
+      {/* MODAL DE EXITO */}
       <Modal
         visible={successModal.visible}
         transparent={true}
@@ -368,7 +368,7 @@ export default function ProductsListScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* MODAL DE CONFIRMACIÓN */}
+      {/* MODAL DE CONFIRMACION */}
       <Modal
         visible={confirmModal.visible}
         transparent={true}

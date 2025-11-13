@@ -168,7 +168,7 @@ export default function AdminHomeScreen({ navigation }) {
         setUsers(result.result || []);
       } else {
         showError(
-          '❌ Error al cargar',
+          'Error al cargar',
           'No se pudieron cargar los usuarios del sistema.',
           'alert-circle',
           '#ef4444'
@@ -177,7 +177,7 @@ export default function AdminHomeScreen({ navigation }) {
     } catch (error) {
       console.error(error);
       showError(
-        '📡 Error de conexión',
+        'Error de conexión',
         'No se pudo conectar al servidor.\n\nVerifica tu conexión a internet.',
         'cloud-offline-outline',
         '#ef4444'
@@ -207,7 +207,7 @@ export default function AdminHomeScreen({ navigation }) {
 
       if (result.isSuccess) {
         showSuccess(
-          '✅ Estado actualizado',
+          'Estado actualizado',
           `El usuario ha sido ${newStatus === 1 ? 'activado' : 'desactivado'} correctamente.`,
           'checkmark-circle',
           '#10b981'
@@ -216,7 +216,7 @@ export default function AdminHomeScreen({ navigation }) {
         await loadUserData();
       } else {
         showError(
-          '❌ Error al actualizar',
+          'Error al actualizar',
           result.message || 'No se pudo cambiar el estado del usuario.',
           'alert-circle',
           '#ef4444'
@@ -225,7 +225,7 @@ export default function AdminHomeScreen({ navigation }) {
     } catch (error) {
       console.error(error);
       showError(
-        '📡 Error de conexión',
+        'Error de conexión',
         'No se pudo actualizar el estado del usuario.\n\nIntenta de nuevo más tarde.',
         'cloud-offline-outline',
         '#ef4444'
@@ -237,7 +237,7 @@ export default function AdminHomeScreen({ navigation }) {
    * Confirmar cambio de estado
    */
   const confirmChangeStatus = (email, currentStatus) => {
-    // IMPORTANTE: Cerrar el modal de detalles primero
+    // Cerrar el modal de detalles primero
     setModalVisible(false);
     
     // Pequeño delay para que se cierre el modal antes de mostrar la confirmación
@@ -246,7 +246,7 @@ export default function AdminHomeScreen({ navigation }) {
       const action = newStatus === 1 ? 'activar' : 'desactivar';
       
       showConfirm(
-        `${newStatus === 1 ? '✅' : '⚠️'} ${action.charAt(0).toUpperCase() + action.slice(1)} usuario`,
+        `${action.charAt(0).toUpperCase() + action.slice(1)} usuario`,
         `¿Estás seguro que deseas ${action} a este usuario?\n\nEsta acción modificará su acceso al sistema.`,
         () => handleChangeStatus(email, newStatus),
         action.charAt(0).toUpperCase() + action.slice(1),
@@ -262,7 +262,7 @@ export default function AdminHomeScreen({ navigation }) {
    */
   const handleLogout = () => {
     showConfirm(
-      '🚪 Cerrar sesión',
+      'Cerrar sesión',
       '¿Estás seguro que deseas cerrar sesión?\n\nDeberás iniciar sesión nuevamente para acceder.',
       async () => {
         const result = await logout();
@@ -271,10 +271,10 @@ export default function AdminHomeScreen({ navigation }) {
             index: 0,
             routes: [{ name: 'Login' }],
           });
-          // ✅ Navegación directa sin modal de éxito
+          // Navegación directa sin modal de éxito
         } else {
           showError(
-            '❌ Error',
+            'Error',
             'No se pudo cerrar sesión.\n\nIntenta de nuevo.',
             'alert-circle',
             '#ef4444'
@@ -316,7 +316,7 @@ export default function AdminHomeScreen({ navigation }) {
             <View style={styles.headerInfo}>
               <Text style={styles.headerLabel}>PANEL DE ADMINISTRACIÓN</Text>
               <Text style={styles.headerTitle}>
-                Hola, {user?.name?.split(' ')[0] || 'Usuario'}! 👋
+                Hola, {user?.name?.split(' ')[0] || 'Usuario'}!
               </Text>
               <Text style={styles.headerSubtitle}>
                 Gestiona tu sistema de manera eficiente
@@ -342,7 +342,7 @@ export default function AdminHomeScreen({ navigation }) {
               <Text style={styles.userName}>{user?.name}</Text>
               <View style={styles.roleBadge}>
                 <Text style={styles.roleText}>
-                  👑 {user?.roles?.[0] || 'Administrador'}
+                  {user?.roles?.[0] || 'Administrador'}
                 </Text>
               </View>
             </View>
@@ -413,7 +413,7 @@ export default function AdminHomeScreen({ navigation }) {
                       styles.userCardStatus,
                       { color: u.status === 1 ? '#059669' : '#6b7280' }
                     ]}>
-                      {u.status === 1 ? '● Activo' : '○ Inactivo'}
+                      {u.status === 1 ? 'Activo' : 'Inactivo'}
                     </Text>
                   </View>
                 </View>
@@ -462,7 +462,7 @@ export default function AdminHomeScreen({ navigation }) {
                     { backgroundColor: selectedUser.status === 1 ? '#10b981' : '#6b7280' }
                   ]}>
                     <Text style={styles.modalStatusText}>
-                      {selectedUser.status === 1 ? '✓ ACTIVO' : '✕ INACTIVO'}
+                      {selectedUser.status === 1 ? 'ACTIVO' : 'INACTIVO'}
                     </Text>
                   </View>
                 </View>
@@ -550,7 +550,7 @@ export default function AdminHomeScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/*  MODAL DE ÉXITO PERSONALIZADO */}
+      {/* MODAL DE ÉXITO PERSONALIZADO */}
       <Modal
         visible={successModal.visible}
         transparent={true}
@@ -1012,7 +1012,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
 
-  // ✅ ESTILOS DEL MODAL DE ERROR PERSONALIZADO
+  //  ESTILOS DEL MODAL DE ERROR PERSONALIZADO
   errorModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',

@@ -1,6 +1,5 @@
 /**
  * Pantalla de Login
- * Con MVVM - usa useAuthViewModel
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -183,7 +182,7 @@ export default function LoginScreen({ navigation }) {
       const userName = result.user?.name || result.user?.userName || 'Usuario';
       
       showWelcome(
-        '¡Bienvenido! 👋',
+        '¡Bienvenido!',
         `Hola, ${userName}!\n\nIniciando sesión...`,
         () => {
           // Navegar según el rol del usuario
@@ -207,7 +206,7 @@ export default function LoginScreen({ navigation }) {
           errorMsg.includes('password') ||
           errorMsg.includes('invalid')) {
         showError(
-          '🔒 Credenciales incorrectas',
+          'Credenciales incorrectas',
           'El correo o la contraseña que ingresaste son incorrectos.\n\nPor favor verifica tus datos e intenta de nuevo.',
           'lock-closed-outline',
           '#ef4444'
@@ -218,7 +217,7 @@ export default function LoginScreen({ navigation }) {
                errorMsg.includes('bloqueada') ||
                errorMsg.includes('intenta de nuevo en')) {
         showError(
-          '⏱️ Cuenta temporalmente bloqueada',
+          'Cuenta temporalmente bloqueada',
           result.error,
           'time-outline',
           '#f59e0b'
@@ -229,7 +228,7 @@ export default function LoginScreen({ navigation }) {
                errorMsg.includes('inactiva') ||
                errorMsg.includes('no existe')) {
         showError(
-          '⚠️ Cuenta no disponible',
+          'Cuenta no disponible',
           'Esta cuenta no existe o está inactiva.\n\nPor favor verifica tus datos o contacta al administrador.',
           'person-remove-outline',
           '#ef4444'
@@ -241,7 +240,7 @@ export default function LoginScreen({ navigation }) {
                errorMsg.includes('connection') ||
                errorMsg.includes('sin conexión')) {
         showError(
-          '📡 Sin conexión',
+          'Sin conexión',
           'No se pudo conectar al servidor.\n\nVerifica tu conexión a internet e intenta de nuevo.',
           'cloud-offline-outline',
           '#f59e0b'
@@ -251,7 +250,7 @@ export default function LoginScreen({ navigation }) {
       else if (errorMsg.includes('timeout') || 
                errorMsg.includes('tiempo de espera')) {
         showError(
-          '⏱️ Tiempo agotado',
+          'Tiempo agotado',
           'La conexión tardó demasiado.\n\nPor favor intenta de nuevo.',
           'time-outline',
           '#f59e0b'
@@ -261,7 +260,7 @@ export default function LoginScreen({ navigation }) {
       else if (errorMsg.includes('servidor') || 
                errorMsg.includes('server error')) {
         showError(
-          '🔧 Error del servidor',
+          'Error del servidor',
           'Hay un problema en el servidor.\n\nPor favor intenta más tarde.',
           'construct-outline',
           '#ef4444'
@@ -270,7 +269,7 @@ export default function LoginScreen({ navigation }) {
       // Error de rol
       else if (errorMsg.includes('rol') || errorMsg.includes('role')) {
         showError(
-          '🛡️ Error de autorización',
+          'Error de autorización',
           'No se pudo determinar tu rol de usuario.\n\nPor favor contacta al administrador.',
           'shield-outline',
           '#ef4444'
@@ -279,7 +278,7 @@ export default function LoginScreen({ navigation }) {
       // Error genérico
       else {
         showError(
-          '❌ Error al iniciar sesión',
+          'Error al iniciar sesión',
           result.error || 'No se pudo iniciar sesión.\n\nPor favor intenta de nuevo más tarde.',
           'alert-circle',
           '#ef4444'
@@ -319,7 +318,7 @@ export default function LoginScreen({ navigation }) {
         {/* Tarjeta de login */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.welcomeText}>¡Bienvenido! 👋</Text>
+            <Text style={styles.welcomeText}>¡Bienvenido!</Text>
             <Text style={styles.loginText}>Inicia sesión en tu cuenta</Text>
           </View>
 
@@ -428,7 +427,7 @@ export default function LoginScreen({ navigation }) {
         {/* Decoración inferior */}
         <View style={styles.bottomDecoration}>
           <Ionicons name="leaf" size={20} color="#d1fae5" />
-          <Text style={styles.bottomText}>Hecho con ❤️ para ti</Text>
+          <Text style={styles.bottomText}>Hecho con cariño para ti</Text>
           <Ionicons name="leaf" size={20} color="#d1fae5" />
         </View>
       </ScrollView>
@@ -581,17 +580,20 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     marginBottom: 28,
+    alignItems: 'center',
   },
   welcomeText: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#065f46',
     marginBottom: 8,
+    textAlign: 'center',
   },
   loginText: {
     fontSize: 15,
     color: '#6b7280',
     fontWeight: '500',
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 18,

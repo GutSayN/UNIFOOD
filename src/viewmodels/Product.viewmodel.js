@@ -75,30 +75,33 @@ export const useProductViewModel = () => {
   }, [currentUserId]);
 
   /**
-   * Refrescar productos silenciosamente (sin indicador de carga)
-   */
-  const refreshProductsSilently = useCallback(async () => {
-    try {
-      // NO usamos setIsRefreshing ni setIsLoading
-      setError(null);
+ * Refrescar productos silenciosamente (sin indicador de carga)
+ */
+const refreshProductsSilently = useCallback(async () => {
+  try {
+    // NO usamos setIsRefreshing ni setIsLoading
+    setError(null);
 
-      let loadedProducts;
-      
-      if (currentUserId) {
-        loadedProducts = await productService.getProductsByUserId(currentUserId);
-      } else {
-        loadedProducts = await productService.getAllProducts();
-      }
-      
-      setProducts(loadedProducts);
-
-      return { success: true };
-    } catch (err) {
-      // Silenciar errores en refresh automático
-      console.error('Error en refresh silencioso:', err);
-      return { success: false };
+    let loadedProducts;
+    
+    if (currentUserId) {
+      loadedProducts = await productService.getProductsByUserId(currentUserId);
+    } else {
+      loadedProducts = await productService.getAllProducts();
     }
-  }, [currentUserId]);
+    
+    setProducts(loadedProducts);
+
+    return { success: true };
+  } catch (err) {
+    // Refresh oculto
+    
+    if (__DEV__) {
+      
+    }
+    return { success: false };
+  }
+}, [currentUserId]);
 
   /**
    * Cargar productos por usuario

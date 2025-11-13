@@ -18,9 +18,9 @@ export class Product {
     this.userPhone = data.userPhone || '';
     this.createdAt = data.createdAt || new Date().toISOString();
     this.updatedAt = data.updatedAt || new Date().toISOString();
-    // ✅ NUEVO: Para mantener orden del backend
+    // Para mantener orden del backend
     this.loadIndex = data.loadIndex !== undefined ? data.loadIndex : null;
-    // ✅ NUEVO: Contadores de votos
+    // Contadores de votos
     this.likesCount = data.likesCount || 0;
     this.dislikesCount = data.dislikesCount || 0;
   }
