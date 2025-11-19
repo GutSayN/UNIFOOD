@@ -25,6 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthViewModel } from '../viewmodels/Auth.viewmodel';
 import { useProductViewModel } from '../viewmodels/Product.viewmodel';
 
+
 const { width } = Dimensions.get('window');
 
 // INTERVALO DE ACTUALIZACIÓN AUTOMÁTICA (15 segundos para likes)
@@ -390,9 +391,14 @@ export default function HomeScreen({ navigation }) {
           >
             <Ionicons name="grid-outline" size={22} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={22} color="#fff" />
-          </TouchableOpacity>
+          
+         <TouchableOpacity onPress={handleProfileNavigation}
+         style={styles.profileButton}
+         activeOpacity={0.7}
+>
+    <Ionicons name="person-circle-outline" size={28} color="white" />
+</TouchableOpacity>
+
         </View>
       </View>
 

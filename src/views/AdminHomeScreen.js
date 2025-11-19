@@ -11,17 +11,17 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
-  StyleSheet,
+  StyleSheet, // Se importa, pero el objeto styles estará vacío aquí
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-//  Usar ViewModels y servicios
+//  Usar ViewModels y servicios
 import { useAuthViewModel } from '../viewmodels/Auth.viewmodel';
 import CONFIG from '../config/app.config';
 import storageService from '../services/Storage.service';
 
 export default function AdminHomeScreen({ navigation }) {
-  //  Usar ViewModel para auth
+  //  Usar ViewModel para auth
   const { user, logout } = useAuthViewModel();
 
   // Estados locales
@@ -256,6 +256,14 @@ export default function AdminHomeScreen({ navigation }) {
       );
     }, 300);
   };
+  
+  /**
+   * Manejar navegación al perfil
+   */
+  const handleProfileNavigation = () => {
+    // Asegúrate de que 'Profile' sea el nombre correcto en tu Stack Navigator
+    navigation.navigate('Profile'); 
+  };
 
   /**
    * Manejar logout con confirmación
@@ -323,14 +331,26 @@ export default function AdminHomeScreen({ navigation }) {
               </Text>
             </View>
 
-            {/* Botón de cerrar sesión */}
-            <TouchableOpacity
-              onPress={handleLogout}
-              style={styles.logoutButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="log-out-outline" size={24} color="white" />
-            </TouchableOpacity>
+            {/* Contenedor de botones (Usuario y Cerrar Sesión) */}
+            <View style={styles.headerButtonsContainer}>
+                {/* Botón de Perfil/Usuario */}
+                <TouchableOpacity
+                    onPress={handleProfileNavigation}
+                    style={styles.profileButton}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="person-circle-outline" size={28} color="white" />
+                </TouchableOpacity>
+
+                {/* Botón de cerrar sesión */}
+                <TouchableOpacity
+                    onPress={handleLogout}
+                    style={styles.logoutButton}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="log-out-outline" size={24} color="white" />
+                </TouchableOpacity>
+            </View>
           </View>
 
           {/* Avatar y rol */}
@@ -609,6 +629,9 @@ export default function AdminHomeScreen({ navigation }) {
   );
 }
 
+// Aquí irían los estilos, pero se proporcionarán en el siguiente bloque de código.
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -700,6 +723,23 @@ const styles = StyleSheet.create({
     color: '#a7f3d0',
     marginBottom: 16,
   },
+  // *** NUEVOS ESTILOS PARA EL BOTÓN DE PERFIL ***
+  headerButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10, // Espacio entre botones
+  },
+  profileButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  // **********************************************
   logoutButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     width: 48,
@@ -1012,7 +1052,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
 
-  //  ESTILOS DEL MODAL DE ERROR PERSONALIZADO
+  //  ESTILOS DEL MODAL DE ERROR PERSONALIZADO
   errorModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',

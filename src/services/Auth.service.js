@@ -16,6 +16,114 @@ class AuthService {
     this.sessionCheckInterval = null;
     AuthService.instance = this;
   }
+  _extractHttpErrorMessage(error, defaultStatus = 500) {
+    let errorMessage = "Error desconocido. Intenta más tarde.";
+    let statusCode = defaultStatus;
+
+    if (error instanceof HttpError) {
+      statusCode = error.status;
+
+      // 1. Intentar obtener el mensaje del cuerpo de la respuesta del servidor (data)
+      if (error.data && error.data.message) {
+        errorMessage = error.data.message;
+      } else if (error.data && error.data.error) {
+        errorMessage = error.data.error;
+      } else if (error.message) {
+        errorMessage = error.message; // Mensaje genérico del HttpError (ej. "HTTP Error: 400")
+      }
+
+      // Si es un 400 y no pudimos extraer un mensaje específico
+      if (statusCode === 400 && errorMessage.includes('400')) {
+          errorMessage = "Datos inválidos. Revisa la información que intentas guardar.";
+      }
+    } else if (error instanceof Error) {
+        errorMessage = error.message;
+        statusCode = 400; // Asumimos un error de validación local o del cliente
+    }
+
+    // Manejo de errores de red (status 0)
+    if (statusCode === 0) {
+      errorMessage = "Error de red. Verifica tu conexión a internet.";
+    }
+
+    return { errorMessage, statusCode };
+  }
+
+/**
+ * Actualiza la información del usuario en el servidor y localmente.
+ */
+
+ // =================================================================
+  // MÉTODOS DE USUARIO
+  // =================================================================
+
+  /**
+   * Actualiza la información del usuario en el servidor y localmente.
+   */
+  async updateUser(data) {
+    try {
+      const url = `${CONFIG.API.AUTH_BASE_URL}/me`;
+      const response = await httpService.put(url, data);
+
+      if (response && response.result) {
+        
+        const updatedUserData = response.result;
+        const updatedUserInstance = new User(updatedUserData);
+        
+        // 🔑 MEJORA: Obtener el token de forma más directa/segura
+        // Se asume que el token no cambia al actualizar el perfil.
+        const token = await storageService.getItem(CONFIG.STORAGE_KEYS.USER_TOKEN);
+
+        // PASO CLAVE: Guardar sesión y actualizar el Singleton
+        await this._saveSession(token, updatedUserInstance); // Guarda el token anterior con los nuevos datos de usuario
+        this.currentUser = updatedUserInstance;
+
+        return response; 
+}
+
+    } catch (error) {
+      console.error("Error en updateUser:", error);
+      
+      const { errorMessage, statusCode } = this._extractHttpErrorMessage(error);
+
+      // Devuelve el objeto de error con el mensaje real para que el componente lo maneje
+      return { 
+        success: false, 
+        message: errorMessage,
+        statusCode: statusCode 
+      };
+    }
+  }
+async deleteAccount() {
+        try {
+            const url = `${CONFIG.API.AUTH_BASE_URL}/me`; 
+            
+            // Usamos httpService.delete. Asumimos que maneja el token (Bearer Token)
+            const response = await httpService.delete(url);
+
+            // Validar la respuesta exitosa
+            if (!response.isSuccess) {
+                // Si la API no devuelve isSuccess, lanzamos un error para que sea capturado
+                throw new Error(response.message || 'Fallo al eliminar la cuenta.');
+            }
+
+            // Limpiamos la sesión después de la eliminación exitosa
+            await this.logout();
+
+            return { 
+                success: true, 
+                message: response.message || "Usuario y sus productos eliminados correctamente."
+            };
+            
+        } catch (error) {
+            // Puedes usar una lógica más simple aquí, ya que el ProfileScreen ya maneja el error.
+            return { 
+                success: false, 
+                message: error.message || 'Error de conexión al eliminar la cuenta.' 
+            };
+        }
+    }
+
 
   /**
    * Iniciar sesión con manejo de errores
@@ -81,6 +189,7 @@ class AuthService {
       throw this._processLoginError(error);
     }
   }
+
 
   /**
    * Procesar errores de login para mensajes claros
