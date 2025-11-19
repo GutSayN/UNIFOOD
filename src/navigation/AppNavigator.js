@@ -17,6 +17,7 @@ import HomeScreen from '../views/HomeScreen';
 import AdminHomeScreen from '../views/AdminHomeScreen';
 import ProductsListScreen from '../views/ProductsListScreen';
 import ProductFormScreen from '../views/ProductFormScreen';
+import ProfileScreen from "../views/ProfileScreen";
 
 const Stack = createStackNavigator();
 
@@ -89,6 +90,7 @@ export default function AppNavigator() {
         {/* Pantallas principales */}
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="AdminHome" component={AdminHomeScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
 
         {/* Pantallas de productos */}
         <Stack.Screen name="ProductsList" component={ProductsListScreen} />
