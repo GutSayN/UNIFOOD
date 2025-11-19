@@ -180,18 +180,15 @@ const updateUser = async () => {
             name: updatedUserData.name || "",
             email: updatedUserData.email || "",
             phoneNumber: updatedUserData.phoneNumber || "",
-            password: "" // Nunca guardar el password
+            password: "" 
         };
         
         setForm(newFormState);
-        setOriginalForm(newFormState); // 👈 CRÍTICO: Actualizar originalForm para que la UI se refresque
-        
-        // ✅ PASO 5: Cerrar modal de edición y mostrar modal de éxito
-        setIsLoading(false);
+        setOriginalForm(newFormState); 
+       setIsLoading(false);
         setIsModalVisible(false);
         
-        // Mostrar modal de éxito personalizado
-        setSuccessModalMessage(response.message || "¡Tus datos han sido actualizados correctamente!");
+        setSuccessModalMessage(response.message || "Usuario actualizado correctamente");
         setIsSuccessModalVisible(true);
 
     } else {
@@ -498,7 +495,7 @@ const updateUser = async () => {
                         <Icon name="times-circle" size={40} color={colors.danger} solid />
                     </View>
 
-                    <Text style={styles.errorModalTitle}>CORRECTO</Text>
+                    <Text style={styles.errorModalTitle}>Alerta</Text>
                     <Text style={styles.errorModalMessage}>
                         {errorModalMessage}
                     </Text>

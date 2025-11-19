@@ -391,14 +391,12 @@ export default function HomeScreen({ navigation }) {
           >
             <Ionicons name="grid-outline" size={22} color="#fff" />
           </TouchableOpacity>
-          
-         <TouchableOpacity onPress={handleProfileNavigation}
-         style={styles.profileButton}
-         activeOpacity={0.7}
->
-    <Ionicons name="person-circle-outline" size={28} color="white" />
-</TouchableOpacity>
+          <TouchableOpacity style={styles.headerButton} onPress={() => navigation.navigate('Profile')}>
 
+            <Ionicons name="document-text-outline" size={22} color="#fff" />
+
+          </TouchableOpacity>
+          
         </View>
       </View>
 
