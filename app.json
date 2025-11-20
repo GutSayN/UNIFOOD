@@ -34,7 +34,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.uttt.unifood"
+      "package": "com.yourcompany.unifood"
     },
     "web": {
       "favicon": "./assets/favicon.png"
