@@ -50,8 +50,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "f4056c44-deaa-4b76-afc6-d6992198bf0b"
+        "projectId": "148ccc0e-8f98-4fc0-acee-37372d23f7a5"
       }
-    }
+    },
+    "owner": "normagc"
   }
 }
