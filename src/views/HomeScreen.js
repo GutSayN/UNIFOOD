@@ -1,5 +1,8 @@
 /**
- * Pantalla Principal (Home)
+ * EJEMPLO: HomeScreen CON DATADOG INTEGRADO
+ * 
+ * Este archivo muestra cómo integrar Datadog en tu HomeScreen
+ * Solo necesitas copiar las líneas marcadas con 🔥 a tu archivo original
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -25,20 +28,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthViewModel } from '../viewmodels/Auth.viewmodel';
 import { useProductViewModel } from '../viewmodels/Product.viewmodel';
 
+// 🔥 IMPORTAR DATADOG
+import { useDatadog } from '../hooks/useDatadog';
 
 const { width } = Dimensions.get('window');
-
-// INTERVALO DE ACTUALIZACIÓN AUTOMÁTICA (15 segundos para likes)
 const AUTO_REFRESH_INTERVAL = 15000;
 
 export default function HomeScreen({ navigation }) {
+  // 🔥 HOOK DE DATADOG
+  const {
+    trackSearch,
+    trackVote,
+    trackWhatsAppContact,
+    trackRefresh,
+    trackProductInteraction,
+    trackEvent,
+    trackError,
+  } = useDatadog('Home'); // Auto-trackea cuando entras a la pantalla
+
   // Estados locales para UI
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const searchAnimation = useState(new Animated.Value(0))[0];
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
-  
-  // Estado para modal de confirmación de logout
   const [logoutModal, setLogoutModal] = useState({
     visible: false,
     title: '¿Cerrar sesión?',
@@ -49,7 +61,6 @@ export default function HomeScreen({ navigation }) {
     cancelText: 'Cancelar',
   });
   
-  // Ref para el intervalo de auto-refresh
   const refreshIntervalRef = useRef(null);
 
   // ViewModels
@@ -69,18 +80,16 @@ export default function HomeScreen({ navigation }) {
    * Cargar productos inicialmente y configurar auto-refresh silencioso
    */
   useEffect(() => {
-    // Cargar productos inicialmente
     loadAllProducts();
 
-    // Configurar auto-refresh cada 15 segundos (silencioso)
     refreshIntervalRef.current = setInterval(() => {
-      // Solo refrescar si no está cargando y no hay búsqueda activa
       if (!isLoading && !searchQuery.trim()) {
         refreshProductsSilently();
+        // 🔥 TRACKEAR AUTO-REFRESH
+        trackRefresh('automatic');
       }
     }, AUTO_REFRESH_INTERVAL);
 
-    // Limpiar intervalo al desmontar
     return () => {
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
@@ -94,59 +103,64 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadAllProducts();
+      // 🔥 TRACKEAR REFRESH AL ENFOCAR
+      trackRefresh('on_focus');
     });
     return unsubscribe;
   }, [navigation]);
 
   /**
-   * Verificar si es mi producto
+   * 🔥 TRACKEAR BÚSQUEDAS - useEffect para detectar cambios en la búsqueda
    */
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const filteredProducts = getFilteredAndSortedProducts();
+      trackSearch(searchQuery, filteredProducts.length);
+    }
+  }, [searchQuery]);
+
   const isMyProduct = (product) => {
     if (!user || !product) return false;
-    
     const productUserId = String(product.userId || '');
     const currentUserId = String(user.id || user.userId || '');
-    
     return productUserId === currentUserId;
   };
 
-  /**
-   * Mostrar modal de confirmación de logout
-   */
   const showLogoutModal = () => {
     setLogoutModal(prev => ({ ...prev, visible: true }));
+    // 🔥 TRACKEAR INTENTO DE LOGOUT
+    trackEvent('logout_modal_opened');
   };
 
-  /**
-   * Cerrar modal de logout
-   */
   const closeLogoutModal = () => {
     setLogoutModal(prev => ({ ...prev, visible: false }));
+    // 🔥 TRACKEAR CANCELACIÓN DE LOGOUT
+    trackEvent('logout_cancelled');
   };
 
-  /**
-   * Manejar logout con modal personalizado
-   */
   const handleLogout = () => {
     showLogoutModal();
   };
 
-  /**
-   * Confirmar logout
-   */
   const confirmLogout = async () => {
     closeLogoutModal();
     
-    // Detener auto-refresh antes de salir
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current);
     }
+    
+    // 🔥 TRACKEAR LOGOUT CONFIRMADO
+    trackEvent('logout_confirmed');
     
     const result = await logout();
     if (result.success) {
       navigation.replace('Login');
     } else {
       Alert.alert('Error', result.error || 'No se pudo cerrar sesión');
+      // 🔥 TRACKEAR ERROR DE LOGOUT
+      trackError(new Error(result.error || 'Logout failed'), {
+        context: 'logout',
+      });
     }
   };
 
@@ -154,6 +168,8 @@ export default function HomeScreen({ navigation }) {
    * Manejar refresh manual (pull-to-refresh)
    */
   const onRefresh = async () => {
+    // 🔥 TRACKEAR REFRESH MANUAL
+    trackRefresh('manual');
     await refreshProducts();
   };
 
@@ -177,8 +193,16 @@ export default function HomeScreen({ navigation }) {
     const message = `Hola! Estoy interesado en tu producto: *${product.name}*\nPrecio: $${product.price.toLocaleString()}`;
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
 
-    Linking.openURL(whatsappUrl).catch(() => {
+    // 🔥 TRACKEAR CONTACTO POR WHATSAPP
+    trackWhatsAppContact(product.productId, product.name, phoneNumber);
+
+    Linking.openURL(whatsappUrl).catch((error) => {
       Alert.alert('Error', 'No se pudo abrir WhatsApp. Verifica que esté instalado.');
+      // 🔥 TRACKEAR ERROR AL ABRIR WHATSAPP
+      trackError(error, {
+        context: 'whatsapp_open',
+        product_id: product.productId,
+      });
     });
   };
 
@@ -191,10 +215,20 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
+    // 🔥 TRACKEAR VOTO
+    const product = products.find(p => p.productId === productId);
+    trackVote(productId, isLike, product?.name || '');
+
     const result = await voteProduct(productId, user.id, isLike);
     
     if (!result.success) {
       Alert.alert('Error', result.error || 'No se pudo registrar el voto');
+      // 🔥 TRACKEAR ERROR DE VOTO
+      trackError(new Error(result.error || 'Vote failed'), {
+        context: 'vote',
+        product_id: productId,
+        vote_type: isLike ? 'like' : 'dislike',
+      });
     }
   };
 
@@ -202,10 +236,18 @@ export default function HomeScreen({ navigation }) {
    * Toggle descripción expandida
    */
   const toggleDescription = (productId) => {
+    const isExpanding = !expandedDescriptions[productId];
+    
     setExpandedDescriptions(prev => ({
       ...prev,
-      [productId]: !prev[productId],
+      [productId]: isExpanding,
     }));
+
+    // 🔥 TRACKEAR EXPANSIÓN DE DESCRIPCIÓN
+    if (isExpanding) {
+      const product = products.find(p => p.productId === productId);
+      trackProductInteraction('expand_description', productId, product?.name || '');
+    }
   };
 
   /**
@@ -225,6 +267,11 @@ export default function HomeScreen({ navigation }) {
     if (showSearch) {
       setSearchQuery('');
     }
+
+    // 🔥 TRACKEAR TOGGLE DE BÚSQUEDA
+    trackEvent('search_toggled', {
+      opened: !showSearch,
+    });
   };
 
   /**
@@ -249,7 +296,6 @@ export default function HomeScreen({ navigation }) {
 
     return (
       <View style={styles.productCard}>
-        {/* Header con info del vendedor */}
         <View style={styles.productHeader}>
           <View style={styles.sellerInfo}>
             <View style={styles.sellerAvatar}>
@@ -270,7 +316,6 @@ export default function HomeScreen({ navigation }) {
           )}
         </View>
 
-        {/* Descripción */}
         {item.description && (
           <View style={styles.descriptionContainer}>
             <Text style={styles.productName}>{item.name}</Text>
@@ -296,7 +341,6 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
 
-        {/* Imagen */}
         {item.imageUrl ? (
           <Image source={{ uri: item.imageUrl }} style={styles.productImage} resizeMode="cover" />
         ) : (
@@ -305,7 +349,6 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
 
-        {/* Interacciones */}
         <View style={styles.interactionBar}>
           <View style={styles.votesContainer}>
             <TouchableOpacity
@@ -373,7 +416,6 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.logoMini}>
@@ -387,20 +429,27 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerButton}
-            onPress={() => navigation.navigate('ProductsList')}
+            onPress={() => {
+              // 🔥 TRACKEAR NAVEGACIÓN A LISTA DE PRODUCTOS
+              trackEvent('navigate_to_products_list');
+              navigation.navigate('ProductsList');
+            }}
           >
             <Ionicons name="grid-outline" size={22} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton} onPress={() => navigation.navigate('Profile')}>
-
+          <TouchableOpacity 
+            style={styles.headerButton} 
+            onPress={() => {
+              // 🔥 TRACKEAR NAVEGACIÓN A PERFIL
+              trackEvent('navigate_to_profile');
+              navigation.navigate('Profile');
+            }}
+          >
             <Ionicons name="document-text-outline" size={22} color="#fff" />
-
           </TouchableOpacity>
-          
         </View>
       </View>
 
-      {/* Búsqueda */}
       <Animated.View style={[styles.searchContainer, { height: searchHeight }]}>
         {showSearch && (
           <View style={styles.searchInputWrapper}>
@@ -422,7 +471,6 @@ export default function HomeScreen({ navigation }) {
         )}
       </Animated.View>
 
-      {/* Contador */}
       {searchQuery.trim() !== '' && (
         <View style={styles.resultsCounter}>
           <Text style={styles.resultsText}>
@@ -431,7 +479,6 @@ export default function HomeScreen({ navigation }) {
         </View>
       )}
 
-      {/* Lista */}
       {filteredProducts.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyCircle}>
@@ -473,7 +520,6 @@ export default function HomeScreen({ navigation }) {
         />
       )}
 
-      {/* MODAL DE LOGOUT PERSONALIZADO */}
       <Modal
         visible={logoutModal.visible}
         transparent={true}
@@ -513,41 +559,18 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
+// Estilos... (los mismos del archivo original)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0fdf4' },
-  
-  // LOADING 
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f0fdf4',
-  },
-  loadingCard: {
-    backgroundColor: 'white',
-    padding: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#065f46',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0fdf4' },
+  loadingCard: { backgroundColor: 'white', padding: 40, borderRadius: 20, alignItems: 'center', shadowColor: '#059669', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
+  loadingText: { marginTop: 16, color: '#065f46', fontSize: 16, fontWeight: '600' },
   header: { backgroundColor: '#065f46', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   logoMini: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff', letterSpacing: 1 },
   headerButtons: { flexDirection: 'row', gap: 12 },
   headerButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#059669', justifyContent: 'center', alignItems: 'center' },
-  logoutButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.2)', justifyContent: 'center', alignItems: 'center' },
   searchContainer: { backgroundColor: '#065f46', paddingHorizontal: 20, overflow: 'hidden' },
   searchInputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 14, height: 48, marginBottom: 12, gap: 10 },
   searchInput: { flex: 1, fontSize: 16, color: '#1f2937', fontWeight: '500' },
@@ -584,84 +607,14 @@ const styles = StyleSheet.create({
   emptySubtext: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 20 },
   clearSearchButton: { backgroundColor: '#059669', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, marginTop: 10 },
   clearSearchButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  
-  // ESTILOS DEL MODAL DE LOGOUT
-  logoutModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  logoutModalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 28,
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  logoutModalIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  logoutModalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  logoutModalMessage: {
-    fontSize: 15,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  logoutModalButtons: {
-    flexDirection: 'row',
-    width: '100%',
-    gap: 12,
-  },
-  logoutModalCancelButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-  },
-  logoutModalCancelText: {
-    color: '#6b7280',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  logoutModalConfirmButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  logoutModalConfirmText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
+  logoutModalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  logoutModalContent: { backgroundColor: '#fff', borderRadius: 24, padding: 28, width: '100%', maxWidth: 400, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10 },
+  logoutModalIcon: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  logoutModalTitle: { fontSize: 22, fontWeight: 'bold', color: '#1f2937', textAlign: 'center', marginBottom: 12 },
+  logoutModalMessage: { fontSize: 15, color: '#6b7280', textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  logoutModalButtons: { flexDirection: 'row', width: '100%', gap: 12 },
+  logoutModalCancelButton: { flex: 1, paddingVertical: 16, borderRadius: 14, alignItems: 'center', backgroundColor: '#f3f4f6', borderWidth: 2, borderColor: '#e5e7eb' },
+  logoutModalCancelText: { color: '#6b7280', fontSize: 16, fontWeight: 'bold' },
+  logoutModalConfirmButton: { flex: 1, paddingVertical: 16, borderRadius: 14, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+  logoutModalConfirmText: { color: '#fff', fontSize: 16, fontWeight: 'bold', letterSpacing: 0.5 },
 });

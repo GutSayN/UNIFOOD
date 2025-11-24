@@ -1,14 +1,20 @@
 /**
  * Navegador Principal de la Aplicación
+ * CON DATADOG INTEGRADO ✅
  */
 
 import React, { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
+// Importar NavigationTracker en lugar de NavigationContainer
+import NavigationTracker from './NavigationTracker';
+
 // Importar servicio de autenticación
 import authService from '../services/Auth.service';
+
+// Importar Datadog
+import datadogService from '../services/Datadog.service';
 
 // Importar pantallas
 import LoginScreen from '../views/LoginScreen';
@@ -38,6 +44,10 @@ export default function AppNavigator() {
       const session = await authService.checkSession();
 
       if (session.isValid && session.user) {
+        // Inicializar Datadog con el userId
+        await datadogService.initialize(session.user.id);
+        datadogService.setUserId(session.user.id);
+
         // Si hay sesión válida, ir a la pantalla correspondiente según el rol
         if (session.user.isAdmin) {
           setInitialRoute('AdminHome');
@@ -45,11 +55,20 @@ export default function AppNavigator() {
           setInitialRoute('Home');
         }
       } else {
-        // Si no hay sesión o expiró, ir a Login
+        // Si no hay sesión, inicializar Datadog sin userId
+        await datadogService.initialize();
         setInitialRoute('Login');
       }
     } catch (error) {
       console.error('Error checking session:', error);
+      
+      // Trackear el error en Datadog
+      datadogService.trackError(error, {
+        context: 'checkSession',
+        location: 'AppNavigator',
+      });
+      
+      await datadogService.initialize();
       setInitialRoute('Login');
     } finally {
       setIsLoading(false);
@@ -75,7 +94,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationTracker>
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{
@@ -96,7 +115,7 @@ export default function AppNavigator() {
         <Stack.Screen name="ProductsList" component={ProductsListScreen} />
         <Stack.Screen name="ProductForm" component={ProductFormScreen} />
       </Stack.Navigator>
-    </NavigationContainer>
+    </NavigationTracker>
   );
 }
 
