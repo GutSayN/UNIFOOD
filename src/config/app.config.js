@@ -35,23 +35,23 @@ const CONFIG = {
   VALIDATION: {
     // Contraseña
     PASSWORD_MIN_LENGTH: 8,
-    MIN_PASSWORD_LENGTH: 8, // Alias
+    MIN_PASSWORD_LENGTH: 8,
     PASSWORD_PATTERN: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/,
     
     // Email
     EMAIL_PATTERN: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-    EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, // Alias
+    EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     
     // Teléfono
     PHONE_LENGTH: 10,
     PHONE_PATTERN: /^\d{10}$/,
-    PHONE_REGEX: /^\d{10}$/, // Alias
+    PHONE_REGEX: /^\d{10}$/,
     
     // Nombre
     NAME_MIN_LENGTH: 3,
-    MIN_NAME_LENGTH: 3, // Alias
+    MIN_NAME_LENGTH: 3,
     NAME_MAX_LENGTH: 50,
-    MAX_NAME_LENGTH: 50, // Alias
+    MAX_NAME_LENGTH: 50,
     NAME_REGEX: /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/,
     
     // Producto - Nombre
@@ -65,56 +65,124 @@ const CONFIG = {
     // Precio
     PRICE_MIN: 0.01,
     PRICE_MAX: 999999.99,
-    MAX_PRODUCT_PRICE: 999999.99, // Alias
+    MAX_PRODUCT_PRICE: 999999.99,
     PRICE_REGEX: /^\d+(\.\d{1,2})?$/,
   },
 
-  // Categorías de productos
+  // Categorías de productos (SOLO COMIDA - ACTUALIZADO)
   CATEGORIES: [
-  "Selecciona una categoría",
-  "🍕 Comida Rápida",
-  "🌮 Comida Mexicana",
-  "🍝 Comida Internacional",
-  "🍰 Postres y Repostería",
-  "☕ Bebidas",
-  "🍿 Snacks",
-  "🥗 Saludable",
-  "🌱 Vegetariano/Vegano",
-  "📱 Celulares y Tablets",
-  "💻 Computadoras",
-  "🎮 Videojuegos",
-  "📷 Cámaras y Fotografía",
-  "🎧 Audio y Audífonos",
-  "⌚ Smartwatches",
-  "👕 Ropa Hombre",
-  "👗 Ropa Mujer",
-  "👟 Zapatos",
-  "👜 Bolsos y Carteras",
-  "💍 Joyería y Accesorios",
-  "🏠 Muebles",
-  "🛋️ Decoración",
-  "🍳 Cocina y Comedor",
-  "🛏️ Dormitorio",
-  "🌿 Plantas y Jardín",
-  "⚽ Deportes",
-  "🏋️ Fitness y Gym",
-  "🚴 Bicicletas",
-  "🏃 Running",
-  "🚗 Autos",
-  "🏍️ Motos",
-  "🛴 Patinetas",
-  "📚 Libros",
-  "📝 Material Escolar",
-  "🎨 Arte y Manualidades",
-  "🔧 Servicios Técnicos",
-  "🏠 Servicios para el Hogar",
-  "👨‍🏫 Clases y Tutorías",
-  "💼 Servicios Profesionales",
-  "🐕 Mascotas y Accesorios",
-  "🐾 Comida para Mascotas",
-  "🎁 Regalos",
-  "🎉 Eventos y Fiestas",
-  "📦 Otro",
+    "Selecciona una categoría",
+    
+    // === COMIDA MEXICANA ===
+    "🌮 Tacos",
+    "🫔 Burritos y Quesadillas",
+    "🥙 Tortas y Pambazo",
+    "🍲 Pozole y Menudo",
+    "🌶️ Enchiladas y Chilaquiles",
+    "🫘 Frijoles y Sopes",
+    "🌽 Elotes y Esquites",
+    "🥗 Ensaladas Mexicanas",
+    
+    // === COMIDA RÁPIDA ===
+    "🍔 Hamburguesas",
+    "🍕 Pizza",
+    "🌭 Hot Dogs",
+    "🍟 Papas Fritas",
+    "🥪 Sándwiches",
+    "🍗 Pollo Frito",
+    "🥙 Wraps y Rolls",
+    
+    // === COMIDA INTERNACIONAL ===
+    "🍝 Pasta Italiana",
+    "🍜 Comida Asiática",
+    "🍱 Sushi y Comida Japonesa",
+    "🥘 Comida Española",
+    "🥗 Comida Mediterránea",
+    "🍛 Comida Hindú",
+    "🥟 Comida China",
+    "🍲 Comida Tailandesa",
+    
+    // === ANTOJITOS Y BOTANAS ===
+    "🍿 Palomitas",
+    "🥨 Pretzels",
+    "🧀 Nachos con Queso",
+    "🌶️ Picantes y Sabritas",
+    "🥜 Cacahuates y Nueces",
+    "🍪 Galletas Saladas",
+    
+    // === POSTRES Y REPOSTERÍA ===
+    "🍰 Pasteles",
+    "🧁 Cupcakes",
+    "🍩 Donas",
+    "🥧 Pay y Tartas",
+    "🍮 Flanes y Gelatinas",
+    "🍨 Helados",
+    "🍪 Galletas Dulces",
+    "🍫 Chocolate y Dulces",
+    "🧇 Waffles y Hotcakes",
+    
+    // === BEBIDAS ===
+    "☕ Café",
+    "🍵 Té",
+    "🥤 Refrescos",
+    "🧃 Jugos Naturales",
+    "🥛 Leche y Bebidas Lácteas",
+    "🧋 Bebidas de Boba",
+    "🍹 Smoothies y Batidos",
+    "💧 Agua y Bebidas Hidratantes",
+    
+    // === COMIDA SALUDABLE ===
+    "🥗 Ensaladas Frescas",
+    "🥙 Bowls Nutritivos",
+    "🍇 Frutas Frescas",
+    "🥑 Aguacate y Tostadas",
+    "🥕 Vegetales al Vapor",
+    "🍠 Camote y Tubérculos",
+    
+    // === VEGETARIANO Y VEGANO ===
+    "🌱 Platillos Veganos",
+    "🥬 Verduras Orgánicas",
+    "🍄 Hongos y Setas",
+    "🥜 Proteínas Vegetales",
+    "🌾 Granos y Cereales",
+    
+    // === DESAYUNOS ===
+    "🍳 Huevos al Gusto",
+    "🥞 Hotcakes",
+    "🥐 Pan Dulce",
+    "🥓 Tocino y Salchichas",
+    "🥣 Cereales y Avena",
+    "🧈 Molletes",
+    
+    // === COMIDAS COMPLETAS ===
+    "🍱 Comida Corrida",
+    "🍛 Platillos del Día",
+    "🍲 Sopas y Caldos",
+    "🥘 Guisados Caseros",
+    
+    // === MARISCOS ===
+    "🦐 Camarones",
+    "🐟 Pescado Fresco",
+    "🦀 Cangrejo y Langosta",
+    "🦑 Ceviche y Aguachiles",
+    "🍤 Coctel de Mariscos",
+    
+    // === CARNES ===
+    "🥩 Carne Asada",
+    "🍖 Carne al Pastor",
+    "🥓 Tocino y Chorizo",
+    "🍗 Pollo",
+    "🐷 Carnitas y Chicharrón",
+    
+    // === PAN Y PANADERÍA ===
+    "🥖 Pan Francés",
+    "🥐 Pan Dulce",
+    "🍞 Pan Blanco",
+    "🥨 Pan Artesanal",
+    "🧁 Panqués",
+    
+    // === OTROS ===
+    "📦 Otro",
   ],
 
   // Configuración de rate limiting

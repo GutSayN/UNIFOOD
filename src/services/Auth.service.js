@@ -60,40 +60,30 @@ class AuthService {
   /**
    * Actualiza la información del usuario en el servidor y localmente.
    */
-  async updateUser(data) {
+// Auth.service.js - Método updateUser actualizado
+async updateUser(data) {
     try {
-      const url = `${CONFIG.API.AUTH_BASE_URL}/me`;
-      const response = await httpService.put(url, data);
+        const url = `${CONFIG.API.AUTH_BASE_URL}/me`;
+        const response = await httpService.patch(url, data);
 
-      if (response && response.result) {
-        
-        const updatedUserData = response.result;
-        const updatedUserInstance = new User(updatedUserData);
-        
-        // 🔑 MEJORA: Obtener el token de forma más directa/segura
-        // Se asume que el token no cambia al actualizar el perfil.
-        const token = await storageService.getItem(CONFIG.STORAGE_KEYS.USER_TOKEN);
-
-        // PASO CLAVE: Guardar sesión y actualizar el Singleton
-        await this._saveSession(token, updatedUserInstance); // Guarda el token anterior con los nuevos datos de usuario
-        this.currentUser = updatedUserInstance;
-
-        return response; 
+        if (response && response.result) {
+            const updatedUserData = response.result;
+            const updatedUserInstance = new User(updatedUserData);
+            const token = await storageService.getItem(CONFIG.STORAGE_KEYS.USER_TOKEN);
+            await this._saveSession(token, updatedUserInstance);
+            this.currentUser = updatedUserInstance;
+            return response; 
+        }
+    } catch (error) {
+        const { errorMessage, statusCode } = this._extractHttpErrorMessage(error);
+        return { 
+            success: false, 
+            message: errorMessage,
+            statusCode: statusCode 
+        };
+    }
 }
 
-    } catch (error) {
-      console.error("Error en updateUser:", error);
-      
-      const { errorMessage, statusCode } = this._extractHttpErrorMessage(error);
-
-      // Devuelve el objeto de error con el mensaje real para que el componente lo maneje
-      return { 
-        success: false, 
-        message: errorMessage,
-        statusCode: statusCode 
-      };
-    }
-  }
 async deleteAccount() {
         try {
             const url = `${CONFIG.API.AUTH_BASE_URL}/me`; 

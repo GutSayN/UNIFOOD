@@ -1,5 +1,6 @@
 /**
  * Pantalla de Mis Productos
+ * CON HEADER MEJORADO CON CÍRCULOS DECORATIVOS ✨
  */
 
 import React, { useEffect, useState } from 'react';
@@ -79,7 +80,7 @@ export default function ProductsListScreen({ navigation }) {
   }, [navigation, user?.id, hasLoadedUserProducts]);
 
   /**
-   * Mostrar modal de exito
+   * Mostrar modal de éxito
    */
   const showSuccess = (title, message) => {
     setSuccessModal({ visible: true, title, message });
@@ -93,7 +94,7 @@ export default function ProductsListScreen({ navigation }) {
   };
 
   /**
-   * Mostrar modal de confirmacion
+   * Mostrar modal de confirmación
    */
   const showConfirm = (title, message, onConfirm, productName = '') => {
     setConfirmModal({ visible: true, title, message, onConfirm, productName });
@@ -124,7 +125,7 @@ export default function ProductsListScreen({ navigation }) {
   const handleDelete = (productId, productName) => {
     showConfirm(
       'Eliminar producto',
-      `El producto "${productName}" sera eliminado permanentemente. Esta acción no se puede deshacer.`,
+      `El producto "${productName}" será eliminado permanentemente. Esta acción no se puede deshacer.`,
       async () => {
         const result = await deleteProduct(productId);
         if (result.success) {
@@ -167,7 +168,7 @@ export default function ProductsListScreen({ navigation }) {
         </View>
       )}
 
-      {/* Informacion */}
+      {/* Información */}
       <View style={styles.productInfo}>
         <View style={styles.productHeader}>
           {item.categoryName && (
@@ -196,7 +197,7 @@ export default function ProductsListScreen({ navigation }) {
           </Text>
         )}
 
-        {/* Botones de Accion */}
+        {/* Botones de Acción */}
         <View style={styles.actionsContainer}>
           <TouchableOpacity
             style={styles.editButton}
@@ -246,12 +247,12 @@ export default function ProductsListScreen({ navigation }) {
           <Ionicons name="alert-circle-outline" size={60} color="#ef4444" />
         </View>
         <Text style={styles.errorText}>Error al cargar usuario</Text>
-        <Text style={styles.errorSubtext}>Por favor, vuelve a iniciar sesion</Text>
+        <Text style={styles.errorSubtext}>Por favor, vuelve a iniciar sesión</Text>
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => navigation.replace('Login')}
         >
-          <Text style={styles.retryButtonText}>Ir al inicio de sesion</Text>
+          <Text style={styles.retryButtonText}>Ir al inicio de sesión</Text>
         </TouchableOpacity>
       </View>
     );
@@ -259,9 +260,19 @@ export default function ProductsListScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* 🎨 HEADER MEJORADO CON CÍRCULOS DECORATIVOS */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        {/* Fondo con círculos decorativos */}
+        <View style={styles.headerBackground}>
+          <View style={styles.circle1} />
+          <View style={styles.circle2} />
+          <View style={styles.circle3} />
+        </View>
+
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
+        >
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
 
@@ -272,7 +283,10 @@ export default function ProductsListScreen({ navigation }) {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.addButton} onPress={handleCreateProduct}>
+        <TouchableOpacity 
+          style={styles.addButton} 
+          onPress={handleCreateProduct}
+        >
           <Ionicons name="add" size={24} color="white" />
         </TouchableOpacity>
       </View>
@@ -314,7 +328,7 @@ export default function ProductsListScreen({ navigation }) {
         />
       )}
 
-      {/* MODAL DE EXITO */}
+      {/* MODAL DE ÉXITO */}
       <Modal
         visible={successModal.visible}
         transparent={true}
@@ -368,7 +382,7 @@ export default function ProductsListScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* MODAL DE CONFIRMACION */}
+      {/* MODAL DE CONFIRMACIÓN */}
       <Modal
         visible={confirmModal.visible}
         transparent={true}
@@ -447,20 +461,57 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0fdf4',
     padding: 20,
   },
+  
+  // 🎨 HEADER MEJORADO CON CÍRCULOS DECORATIVOS
   header: {
-    backgroundColor: '#065f46',
+    position: 'relative',
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    overflow: 'hidden',
   },
+  headerBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#065f46',
+  },
+  circle1: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: '#059669',
+    opacity: 0.2,
+    top: -70,
+    right: -50,
+  },
+  circle2: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: '#10b981',
+    opacity: 0.15,
+    bottom: -30,
+    left: -30,
+  },
+  circle3: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#34d399',
+    opacity: 0.1,
+    top: 40,
+    left: '40%',
+  },
+  
   backButton: {
     width: 44,
     height: 44,
@@ -468,18 +519,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1,
   },
-  headerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 16 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff', letterSpacing: 0.5 },
-  headerSubtitle: { fontSize: 13, color: '#d1fae5', marginTop: 4, fontWeight: '500' },
+  headerCenter: { 
+    flex: 1, 
+    alignItems: 'center', 
+    paddingHorizontal: 16,
+    zIndex: 1,
+  },
+  headerTitle: { 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    color: '#fff', 
+    letterSpacing: 0.5 
+  },
+  headerSubtitle: { 
+    fontSize: 13, 
+    color: '#d1fae5', 
+    marginTop: 4, 
+    fontWeight: '500' 
+  },
   addButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#059669',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1,
   },
+  
   listContent: { padding: 12, paddingBottom: 24 },
   columnWrapper: { justifyContent: 'space-between' },
   productCard: {

@@ -191,7 +191,14 @@ async request(url, options = {}) {
       headers,
     });
   }
-
+  // Http.service.js - Agregar método patch
+async patch(url, data, options = {}) {
+    return this.request(url, {
+        ...options,
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+}
   /**
    * PUT con FormData
    */
