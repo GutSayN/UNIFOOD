@@ -30,6 +30,7 @@ import ProfileScreen from "../views/ProfileScreen";
 import AdminHomeScreen from '../views/AdminHomeScreen';
 import AdminUsersScreen from '../views/AdminUsersScreen';
 import AdminProductsScreen from '../views/AdminProductsScreen';
+import AdminProductDetailScreen from '../views/AdminProductDetailScreen';
 
 
 const Stack = createStackNavigator();
@@ -137,6 +138,7 @@ export default function AppNavigator() {
         
         {/* Gestión de Productos */}
         <Stack.Screen name="AdminProducts" component={AdminProductsScreen} />
+        <Stack.Screen name="AdminProductDetail" component={AdminProductDetailScreen} />
         
       </Stack.Navigator>
     </NavigationTracker>

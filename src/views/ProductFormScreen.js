@@ -1,6 +1,7 @@
 /**
  * Pantalla de Formulario de Producto (Crear/Editar)
  * Con MVVM - usa useAuthViewModel y useProductViewModel
+ * CON MANEJO MEJORADO DE ERRORES PARA ANDROID ✅
  */
 
 import React, { useState, useEffect } from 'react';
@@ -109,13 +110,11 @@ export default function ProductFormScreen({ navigation, route }) {
       return;
     }
 
-    // Comparar cada campo
     const nameChanged = formData.name !== originalFormData.name;
     const priceChanged = formData.price !== originalFormData.price;
     const descriptionChanged = formData.description !== originalFormData.description;
     const categoryChanged = formData.categoryName !== originalFormData.categoryName;
     
-    // Comparar imagen (null vs null, uri vs uri)
     const imageChanged = (() => {
       const currentUri = formData.image?.uri || null;
       const originalUri = originalFormData.image?.uri || null;
@@ -376,15 +375,22 @@ export default function ProductFormScreen({ navigation, route }) {
   };
 
   /**
-   * ENVIAR FORMULARIO CON MANEJO COMPLETO DE ERRORES
+   * ENVIAR FORMULARIO CON MANEJO COMPLETO DE ERRORES PARA ANDROID
    */
   const handleSubmit = async () => {
+    console.log('📱 [ProductForm] Iniciando handleSubmit');
+    console.log('📱 [ProductForm] Platform:', Platform.OS);
+    console.log('📱 [ProductForm] isEditMode:', isEditMode);
+    console.log('📱 [ProductForm] User ID:', user?.id);
+    
     // Validar formulario
     if (!validateForm()) {
+      console.log('❌ [ProductForm] Validación fallida');
       return;
     }
 
     if (!user) {
+      console.log('❌ [ProductForm] No hay usuario');
       showError(
         'Error de sesión',
         'No se pudo obtener la información del usuario.\n\nPor favor cierra sesión e inicia sesión nuevamente.'
@@ -392,21 +398,30 @@ export default function ProductFormScreen({ navigation, route }) {
       return;
     }
 
+    console.log('✅ [ProductForm] Validación exitosa, enviando a API...');
+
     let result;
 
     try {
       if (isEditMode) {
+        console.log('📝 [ProductForm] Modo edición, actualizando producto ID:', product.productId);
         result = await updateProduct(product.productId, formData);
       } else {
+        console.log('➕ [ProductForm] Modo creación, creando nuevo producto');
         result = await createProduct(formData, user.id);
       }
 
-      if (result.success) {
+      console.log('📊 [ProductForm] Resultado recibido:', result);
+
+      if (result && result.success) {
+        console.log('✅ [ProductForm] Producto guardado exitosamente');
+        
         showSuccess(
           '¡Éxito!',
-          isEditMode ? 'Tu producto ha sido actualizado correctamente y ya está disponible en tu catálogo.' : 'Tu producto ha sido creado correctamente y ya está visible para todos los usuarios.',
+          isEditMode 
+            ? 'Tu producto ha sido actualizado correctamente y ya está disponible en tu catálogo.' 
+            : 'Tu producto ha sido creado correctamente y ya está visible para todos los usuarios.',
           () => {
-            // Resetear la navegación: Home → ProductsList
             navigation.reset({
               index: 1,
               routes: [
@@ -420,9 +435,12 @@ export default function ProductFormScreen({ navigation, route }) {
           'Ver mis productos'
         );
       } else {
+        console.log('❌ [ProductForm] Resultado no exitoso:', result?.error);
+        
         // Manejar errores del resultado
-        if (result.error) {
+        if (result && result.error) {
           const errorMsg = result.error.toLowerCase();
+          console.log('🔍 [ProductForm] Analizando error:', errorMsg);
           
           // DETECTAR MALAS PALABRAS
           if (errorMsg.includes("lenguaje inapropiado") || 
@@ -451,7 +469,6 @@ export default function ProductFormScreen({ navigation, route }) {
               '#ef4444'
             );
             
-            // Limpiar la imagen rechazada
             setFormData(prev => ({ ...prev, image: null }));
             
           } else if (errorMsg.includes("price must not be greater than") || 
@@ -476,6 +493,10 @@ export default function ProductFormScreen({ navigation, route }) {
         }
       }
     } catch (error) {
+      console.error('💥 [ProductForm] Exception capturada:', error);
+      console.error('💥 [ProductForm] Error message:', error.message);
+      console.error('💥 [ProductForm] Error stack:', error.stack);
+      
       // Manejar excepciones
       let errorTitle = "Error al guardar";
       let errorMessage = "Ocurrió un problema al guardar el producto.";
@@ -508,12 +529,12 @@ export default function ProductFormScreen({ navigation, route }) {
                         "Por favor selecciona una imagen diferente que cumpla con nuestras políticas de contenido.";
           errorIcon = 'close-circle';
           
-          // Limpiar la imagen rechazada
           setFormData(prev => ({ ...prev, image: null }));
           
-        } else if (errorMsg.includes("network") || errorMsg.includes("conexión")) {
+        } else if (errorMsg.includes("network") || errorMsg.includes("conexión") || errorMsg.includes("timeout")) {
           errorTitle = "Sin conexión";
-          errorMessage = "Error de conexión a internet.\n\nVerifica tu conexión e intenta de nuevo.";
+          errorMessage = "Error de conexión a internet.\n\nVerifica tu conexión e intenta de nuevo.\n\n" +
+                        (Platform.OS === 'android' ? 'Si el problema persiste, verifica los permisos de red de la app.' : '');
           errorIcon = 'cloud-offline-outline';
           errorColor = '#f59e0b';
           
@@ -526,7 +547,6 @@ export default function ProductFormScreen({ navigation, route }) {
               if (errorData.message) {
                 const serverMsg = errorData.message.toLowerCase();
                 
-                // Detectar malas palabras del servidor
                 if (serverMsg.includes("lenguaje inapropiado") ||
                     serverMsg.includes("malas palabras") ||
                     serverMsg.includes("palabras ofensivas")) {
@@ -535,7 +555,6 @@ export default function ProductFormScreen({ navigation, route }) {
                                 "Por favor revisa el nombre, descripción y categoría.";
                   errorIcon = 'close-circle';
                   
-                // Detectar imagen rechazada del servidor
                 } else if (serverMsg.includes("imagen rechazada") || 
                     serverMsg.includes("contenido sensible") ||
                     serverMsg.includes("contenido inapropiado")) {
@@ -565,7 +584,8 @@ export default function ProductFormScreen({ navigation, route }) {
           
         } else {
           // Mostrar el mensaje original del servidor si está disponible
-          errorMessage = error.message;
+          errorMessage = error.message + "\n\n" + 
+                        (Platform.OS === 'android' ? 'Plataforma: Android' : 'Plataforma: iOS');
         }
       }
       
@@ -1438,7 +1458,7 @@ const styles = StyleSheet.create({
   // ESTILOS DEL MODAL DE ERROR PERSONALIZADO
   errorModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.66)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -1499,7 +1519,7 @@ const styles = StyleSheet.create({
   // ESTILOS DEL MODAL DE CONFIRMACIÓN PERSONALIZADO
   confirmModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.66)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -1579,7 +1599,7 @@ const styles = StyleSheet.create({
   // ESTILOS DEL MODAL DE ÉXITO PERSONALIZADO
   successModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.66)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

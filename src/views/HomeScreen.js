@@ -2,6 +2,7 @@
  * Pantalla Principal (Home)
  * CON HEADER MEJORADO CON CÍRCULOS DECORATIVOS ✨
  * CON FILTRO DE CATEGORÍAS EN TIEMPO REAL ✅
+ * CON VISOR DE IMÁGENES MODERNO ✅
  * CON DATADOG INTEGRADO ✅
  */
 
@@ -36,7 +37,7 @@ import CONFIG from '../config/app.config';
 // 🔥 DATADOG
 import { useDatadog } from '../hooks/useDatadog';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const AUTO_REFRESH_INTERVAL = 5000;
 
 export default function HomeScreen({ navigation }) {
@@ -65,6 +66,11 @@ export default function HomeScreen({ navigation }) {
   // Estado para tracking de votos del usuario
   const [userVotes, setUserVotes] = useState({});
   
+  // 🖼️ Estados para visor de imágenes moderno
+  const [expandedImage, setExpandedImage] = useState(null);
+  const [imageAspectRatio, setImageAspectRatio] = useState(1);
+  const modalOpacity = useState(new Animated.Value(0))[0];
+  
   const [logoutModal, setLogoutModal] = useState({
     visible: false,
     title: '¿Cerrar sesión?',
@@ -89,6 +95,64 @@ export default function HomeScreen({ navigation }) {
     searchProducts,
     voteProduct,
   } = useProductViewModel();
+
+  /**
+   * 🖼️ Abrir modal con imagen (Click simple)
+   */
+  const handleImagePress = (imageUrl, productName) => {
+    // Primero calcular dimensiones de la imagen ANTES de mostrar el modal
+    Image.getSize(
+      imageUrl,
+      (imgWidth, imgHeight) => {
+        const aspectRatio = imgWidth / imgHeight;
+        setImageAspectRatio(aspectRatio);
+        
+        // AHORA SÍ mostramos el modal con las dimensiones correctas
+        setExpandedImage({ uri: imageUrl, name: productName });
+        
+        // Animación de entrada del modal
+        Animated.spring(modalOpacity, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
+        }).start();
+
+        trackEvent('image_modal_opened', {
+          product_name: productName,
+          image_url: imageUrl,
+        });
+      },
+      (error) => {
+        console.log('Error getting image size:', error);
+        // Si hay error, usar aspect ratio por defecto y mostrar igual
+        setImageAspectRatio(1);
+        setExpandedImage({ uri: imageUrl, name: productName });
+        
+        Animated.spring(modalOpacity, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
+        }).start();
+      }
+    );
+  };
+
+  /**
+   * 🖼️ Cerrar modal de imagen
+   */
+  const handleCloseImage = () => {
+    Animated.timing(modalOpacity, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setExpandedImage(null);
+    });
+
+    trackEvent('image_modal_closed');
+  };
 
   /**
    * Guardar votos en AsyncStorage
@@ -478,8 +542,18 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
 
+        {/* 🖼️ IMAGEN SIMPLE */}
         {item.imageUrl ? (
-          <Image source={{ uri: item.imageUrl }} style={styles.productImage} resizeMode="cover" />
+          <TouchableOpacity 
+            activeOpacity={0.95}
+            onPress={() => handleImagePress(item.imageUrl, item.name)}
+          >
+            <Image 
+              source={{ uri: item.imageUrl }} 
+              style={styles.productImage} 
+              resizeMode="cover" 
+            />
+          </TouchableOpacity>
         ) : (
           <View style={styles.noImage}>
             <Ionicons name="image-outline" size={60} color="#d1d5db" />
@@ -773,6 +847,71 @@ export default function HomeScreen({ navigation }) {
         />
       )}
 
+      {/* 🖼️ MODAL ESTILO POPUP MODERNO SIMPLIFICADO */}
+      <Modal
+        visible={expandedImage !== null}
+        transparent={true}
+        animationType="none"
+        onRequestClose={handleCloseImage}
+        statusBarTranslucent
+      >
+        <Animated.View 
+          style={[
+            styles.modalOverlay,
+            { opacity: modalOpacity }
+          ]}
+        >
+          {/* Fondo oscuro clickeable para cerrar */}
+          <TouchableOpacity 
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={handleCloseImage}
+          />
+
+          {/* Popup/Card con la imagen */}
+          <Animated.View 
+            style={[
+              styles.modalCard,
+              {
+                opacity: modalOpacity,
+                transform: [{
+                  scale: modalOpacity.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.9, 1],
+                  }),
+                }],
+              }
+            ]}
+          >
+            {/* Botón de cerrar flotante */}
+            <TouchableOpacity 
+              style={styles.floatingCloseButton}
+              onPress={handleCloseImage}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close-circle" size={36} color="#fff" />
+            </TouchableOpacity>
+
+            {/* Imagen */}
+            <View 
+              style={[
+                styles.modalImageContainer,
+                {
+                  aspectRatio: imageAspectRatio,
+                }
+              ]}
+            >
+              <Image
+                source={{ uri: expandedImage?.uri }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            </View>
+
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
       {/* MODAL DE LOGOUT */}
       <Modal
         visible={logoutModal.visible}
@@ -928,9 +1067,78 @@ const styles = StyleSheet.create({
   productPrice: { fontSize: 18, fontWeight: 'bold', color: '#059669', marginBottom: 8 },
   productDescription: { fontSize: 14, color: '#374151', lineHeight: 20 },
   seeMoreText: { fontSize: 14, color: '#059669', fontWeight: '600', marginTop: 4 },
-  productImage: { width: '100%', height: 300, backgroundColor: '#f9fafb' },
+  
+  // IMAGEN SIMPLE
+  productImage: { 
+    width: '100%', 
+    height: 300,
+  },
   noImage: { width: '100%', height: 300, backgroundColor: '#f9fafb', justifyContent: 'center', alignItems: 'center' },
   
+  // MODAL ESTILO POPUP MODERNO
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 10,
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  modalCard: {
+    backgroundColor: '#000',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 600,
+    maxHeight: '95%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.5,
+    shadowRadius: 30,
+    elevation: 20,
+    position: 'relative',
+  },
+  
+  // Botón de cerrar flotante
+  floatingCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  
+  // Contenedor de imagen en modal
+  modalImageContainer: {
+    width: '100%',
+    minHeight: 300,
+    maxHeight: '95%',
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  
+  // BARRA DE INTERACCIÓN
   interactionBar: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
@@ -1045,6 +1253,7 @@ const styles = StyleSheet.create({
   emptyCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#d1fae5', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   emptyText: { fontSize: 20, fontWeight: 'bold', color: '#065f46', marginBottom: 8, textAlign: 'center' },
   emptySubtext: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 20 },
+
   
   // Modal de logout
   logoutModalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
