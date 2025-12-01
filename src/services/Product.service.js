@@ -215,17 +215,39 @@ class ProductService {
       }
       
       // Agregar imagen
+     // ... (código anterior de createProduct)
+
+      // Agregar imagen (ESTA ES LA PARTE CORREGIDA)
       if (productData.image && productData.image.uri) {
         const imageUri = productData.image.uri;
-        const uriParts = imageUri.split('.');
-        const fileType = uriParts[uriParts.length - 1];
         
+        // 1. Obtener nombre del archivo. Si no tiene, inventamos uno.
+        let filename = imageUri.split('/').pop();
+        if (!filename) filename = `photo_${Date.now()}.jpg`;
+
+        // 2. Determinar la extensión y el tipo (MimeType)
+        let match = /\.(\w+)$/.exec(filename);
+        let type = match ? `image/${match[1]}` : 'image/jpeg';
+
+        // 3. CORRECCIÓN PARA ANDROID:
+        // Android es muy estricto. Si dice 'image/jpg', cámbialo a 'image/jpeg'
+        if (type === 'image/jpg') type = 'image/jpeg';
+        
+        // Si no se detectó extensión, asumir jpeg
+        if (!match) {
+            filename += '.jpg';
+        }
+
+        console.log('📱 Enviando imagen a Android:', { uri: imageUri, name: filename, type: type });
+
         formData.append('image', {
-          uri: imageUri,
-          name: `product_${Date.now()}.${fileType}`,
-          type: `image/${fileType}`,
+          uri: imageUri,       // Ruta
+          name: filename,      // OBLIGATORIO: Nombre con extensión
+          type: type,          // OBLIGATORIO: MimeType válido (ej: image/jpeg)
         });
       }
+
+      // ... (resto del código: httpService.postFormData...)
 
       const response = await httpService.postFormData(
         CONFIG.API.PRODUCTS_BASE_URL,
@@ -300,18 +322,24 @@ class ProductService {
       }
       
       // Agregar imagen solo si es nueva
+      // Agregar imagen solo si es nueva (CORREGIDO)
       if (productData.image && productData.image.uri) {
         const imageUri = productData.image.uri;
         
         if (!imageUri.startsWith('http') && !imageUri.startsWith('/')) {
-          const uriParts = imageUri.split('.');
-          const fileType = uriParts[uriParts.length - 1];
-          
-          formData.append('image', {
-            uri: imageUri,
-            name: `product_${Date.now()}.${fileType}`,
-            type: `image/${fileType}`,
-          });
+            // Lógica segura para Android
+            let filename = imageUri.split('/').pop();
+            let match = /\.(\w+)$/.exec(filename);
+            let type = match ? `image/${match[1]}` : 'image/jpeg';
+            
+            if (type === 'image/jpg') type = 'image/jpeg';
+            if (!match) filename += '.jpg';
+
+            formData.append('image', {
+                uri: imageUri,
+                name: filename,
+                type: type,
+            });
         }
       }
 

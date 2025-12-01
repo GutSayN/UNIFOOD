@@ -58,88 +58,99 @@ class HttpService {
  /**
  * Realizar petición HTTP
  */
-async request(url, options = {}) {
-  try {
-    // Configuración por defecto
-    const defaultConfig = {
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': '*/*',
-      },
-      timeout: CONFIG.API.TIMEOUT,
-    };
-
-    // Combinar configuración
-    let config = {
-      ...defaultConfig,
-      ...options,
-      headers: {
-        ...defaultConfig.headers,
-        ...options.headers,
-      },
-    };
-
-    //  Aplicar interceptores de request (con URL)
-    config = await this._applyRequestInterceptors(url, config);
-
-    // Crear AbortController para timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.timeout);
-
+/**
+   * Realizar petición HTTP (CORREGIDO)
+   */
+  async request(url, options = {}) {
     try {
-      // Realizar petición
-      const response = await fetch(url, {
-        ...config,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      // Parsear respuesta
-      let data;
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        data = await response.text();
-      }
-
-      // Crear objeto de respuesta
-      let responseObj = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-        data,
-        ok: response.ok,
+      // Configuración por defecto
+      const defaultConfig = {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        timeout: CONFIG.API.TIMEOUT,
       };
 
-      // Aplicar interceptores de response
-      responseObj = await this._applyResponseInterceptors(responseObj);
+      // Combinar configuración
+      let config = {
+        ...defaultConfig,
+        ...options,
+        headers: {
+          ...defaultConfig.headers,
+          ...options.headers,
+        },
+      };
 
-      // Manejar errores HTTP
-      if (!response.ok) {
-        throw new HttpError(
-          `HTTP Error: ${response.status}`,
-          response.status,
-          data
-        );
+      // APLICAR INTERCEPTORES DE REQUEST
+      config = await this._applyRequestInterceptors(url, config);
+
+      // --- FIX CRÍTICO PARA ANDROID ---
+      // Si el cuerpo es FormData, ELIMINAR Content-Type para que 
+      // fetch genere el boundary automáticamente.
+      if (config.body instanceof FormData) {
+         delete config.headers['Content-Type'];
       }
+      // -------------------------------
 
-      return responseObj.data;
+      // Crear AbortController para timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+
+      try {
+        // Realizar petición
+        const response = await fetch(url, {
+          ...config,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        // Parsear respuesta
+        let data;
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          data = await response.text();
+        }
+
+        // Crear objeto de respuesta
+        let responseObj = {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          data,
+          ok: response.ok,
+        };
+
+        // Aplicar interceptores de response
+        responseObj = await this._applyResponseInterceptors(responseObj);
+
+        // Manejar errores HTTP
+        if (!response.ok) {
+          throw new HttpError(
+            `HTTP Error: ${response.status}`,
+            response.status,
+            data
+          );
+        }
+
+        return responseObj.data;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        
+        if (error.name === 'AbortError') {
+          throw new HttpError('Tiempo de espera agotado', 408);
+        }
+        throw error;
+      }
     } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if (error.name === 'AbortError') {
-        throw new HttpError('Tiempo de espera agotado', 408);
-      }
-      throw error;
+      // No mostrar en consola, solo manejar el error
+      throw this._handleError(error);
     }
-  } catch (error) {
-    // No mostrar en consola, solo manejar el error
-    throw this._handleError(error);
   }
-}
 
   /**
    * GET request
